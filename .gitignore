@@ -1,0 +1,4 @@
+node_modules/
+harness/out/
+*.zip
+.DS_Store
