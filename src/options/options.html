@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Quiet Tab settings</title>
+<style>
+  body { margin: 0; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; color: #24292f; background: #f4f4f2; }
+  main { max-width: 640px; margin: 32px auto; padding: 0 20px; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  .notice { background: #fff7e6; border: 1px solid #f0d199; border-radius: 6px; padding: 14px 16px; margin-bottom: 24px; }
+  .notice strong { display: block; margin-bottom: 4px; }
+  section { background: #fff; border: 1px solid #e4e4e1; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 14px; margin: 0 0 12px; }
+  label.f { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; margin-bottom: 12px; }
+  label.f span { color: #444c56; }
+  input[type=text], select, textarea { font: inherit; padding: 6px 8px; border: 1px solid #d0d0cc; border-radius: 4px; }
+  textarea { width: 100%; height: 140px; font: 12px ui-monospace, Menlo, Consolas, monospace; box-sizing: border-box; }
+  .hint { color: #7a828c; font-size: 12.5px; margin: 4px 0 0; }
+  button { font: inherit; padding: 6px 14px; border-radius: 4px; border: 1px solid #3d6b8c; background: #3d6b8c; color: #fff; }
+  button.ghost { background: #fff; color: #3d6b8c; }
+  #saved { margin-left: 10px; color: #3d7a4f; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Quiet Tab</h1>
+
+  <div class="notice">
+    <strong>Before you rely on this</strong>
+    This changes what your screen looks like to someone standing behind you. It does not change
+    what your employer can see. If your work computer or network is monitored, your IT team can
+    still see which sites you visit, and browser extensions may be visible to them too. Check your
+    workplace's acceptable-use policy, and consider job hunting on your own device.
+  </div>
+
+  <section>
+    <h2>Appearance</h2>
+    <label class="f"><span>Interface</span><select id="skin"></select></label>
+    <label class="f"><span>File name</span><input type="text" id="fileName"></label>
+    <label class="f" id="initialsRow"><span>Avatar initials</span><input type="text" id="initials" maxlength="2" placeholder="Leave blank for a plain icon"></label>
+    <label class="f"><span>Code organisation names</span><input type="checkbox" id="codeSources"></label>
+    <p class="hint">Shows organisations as codes like NPC-220 instead of their names.</p>
+  </section>
+
+  <section>
+    <h2>Archive sheet</h2>
+    <label class="f"><span>Switch to Archive on window blur</span><input type="checkbox" id="blurOnBlur"></label>
+    <p class="hint">Shortcut: <b id="key">Alt+Shift+Q</b>. Change it at chrome://extensions/shortcuts.</p>
+    <p class="hint" style="margin:12px 0 6px">Paste rows from your own spreadsheet (first row is headers). Leave empty to use the built-in sheet.</p>
+    <textarea id="archive" placeholder="Ref&#9;Account&#9;Owner&#9;…"></textarea>
+  </section>
+
+  <button id="save">Save</button> <button id="reset" class="ghost">Reset archive</button><span id="saved"></span>
+</main>
+<script src="../content/archive-default.js"></script>
+<script src="../render/util.js"></script>
+<script src="../render/skins/classic.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

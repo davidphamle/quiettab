@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Quiet Tab",
+  "version": "0.3.0",
+  "description": "A calm, spreadsheet-style view for a busy tab.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.linkedin.com/*"],
+  "background": { "service_worker": "src/background.js" },
+  "action": {
+    "default_title": "Quiet Tab",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
+  },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "128": "icons/128.png" },
+  "options_page": "src/options/options.html",
+  "commands": {
+    "panic": {
+      "suggested_key": { "default": "Alt+Shift+Q" },
+      "description": "Switch to the archive sheet"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "css": ["src/armour.css"],
+      "js": ["src/content/early.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": [
+        "src/content/settings.js",
+        "src/content/dom.js",
+        "src/content/archive-default.js",
+        "src/render/util.js",
+        "src/render/filters.js",
+        "src/render/grid.js",
+        "src/render/card.js",
+        "src/render/form.js",
+        "src/render/skins/classic.js",
+        "src/render/shell.js",
+        "src/content/app.js",
+        "src/content/main.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

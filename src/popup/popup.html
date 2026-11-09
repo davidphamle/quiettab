@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Status</title>
+<style>
+  /* Built to survive being seen: it reads as a file tool's status panel.
+     Nothing here names the source site, its subject, or "hiding". */
+  body { margin: 0; width: 240px; font: 12.5px/1.4 "Segoe UI", system-ui, sans-serif; color: #24292f; background: #fbfbfa; }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #ececea; }
+  .row:last-child { border-bottom: 0; }
+  .k { color: #7a828c; }
+  kbd { font: 11px ui-monospace, Menlo, Consolas, monospace; background: #fff; border: 1px solid #d0d0cc; border-radius: 3px; padding: 1px 5px; }
+  button { font: inherit; background: none; border: 0; padding: 0; color: #3d6b8c; cursor: pointer; }
+  .ok { color: #3d7a4f; } .warn { color: #a8620c; }
+</style>
+</head>
+<body>
+  <div class="row"><span class="k">Archive view</span><kbd id="key">Alt+Shift+Q</kbd></div>
+  <div class="row"><span class="k">View</span><button id="pause">On</button></div>
+  <div class="row"><span class="k">Source</span><span id="health">—</span></div>
+  <div class="row"><span class="k">Settings</span><button id="opts">Open</button></div>
+  <script src="popup.js"></script>
+</body>
+</html>

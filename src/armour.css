@@ -1,0 +1,30 @@
+/*
+ * Armour. Loaded by the manifest at document_start, before any script and
+ * before first paint. Zero JS dependency: if every script fails, the page
+ * stays blank rather than showing the source site.
+ *
+ * On by default. Lifts only when JS adds .qt-off to <html> (the user paused
+ * the view). Nothing else may remove it.
+ *
+ * The page body is kept at opacity 0, NOT display:none: the source list
+ * lazy-loads through IntersectionObserver, which works on layout
+ * intersection and ignores opacity. display:none would stop it loading.
+ */
+html:not(.qt-off) {
+  background: #ffffff !important;
+  color-scheme: light !important;
+}
+html:not(.qt-off) body {
+  opacity: 0 !important;
+  background: #ffffff !important;
+}
+html:not(.qt-off) body img,
+html:not(.qt-off) body picture,
+html:not(.qt-off) body video,
+html:not(.qt-off) body canvas,
+html:not(.qt-off) body iframe {
+  visibility: hidden !important;
+}
+/* Brand colour cannot leak through scrollbars or the overscroll area. */
+html:not(.qt-off)::-webkit-scrollbar { display: none !important; }
+html:not(.qt-off) { scrollbar-width: none !important; overflow: hidden !important; }

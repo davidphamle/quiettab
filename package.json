@@ -1,0 +1,14 @@
+{
+  "name": "quiet-tab",
+  "version": "0.3.0",
+  "description": "Chrome extension: a calm, spreadsheet-style view over a busy tab.",
+  "scripts": {
+    "test": "node harness/acceptance.mjs classic"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3",
+    "puppeteer-core": "^23.11.1"
+  },
+  "private": true,
+  "type": "module"
+}
