@@ -1,9 +1,10 @@
 {
   "name": "quiet-tab",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Chrome extension: a calm, spreadsheet-style view over a busy tab.",
   "scripts": {
-    "test": "node harness/acceptance.mjs classic"
+    "test": "node harness/acceptance.mjs workbook classic",
+    "visual": "node harness/visual.mjs workbook && node harness/visual.mjs classic"
   },
   "devDependencies": {
     "jsdom": "^24.1.3",

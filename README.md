@@ -24,6 +24,16 @@ browsing roles at your desk looks like working in a tracker.
   page's own dialog, so typed form values survive and nothing can trigger a
   "leave site?" prompt.
 
+## Interfaces
+
+Pick one on the options page. All share the same grid, record panel, form
+sheet, filters and panic behaviour.
+
+| Skin | Looks like |
+|---|---|
+| **Workbook** (default) | A web spreadsheet: menus, formatting toolbar, name box + formula bar, frozen header with filter carets, sheet tabs |
+| **Classic** | A read-only csv viewer with filter chips |
+
 ## Install (unpacked)
 
 1. `chrome://extensions` → enable **Developer mode**.
@@ -34,7 +44,8 @@ browsing roles at your desk looks like working in a tracker.
 
 ```bash
 npm install
-npm test                      # acceptance suite against the DOM fixture
+npm test                      # acceptance suite, once per skin
+CHROME=/path/to/chrome npm run visual   # screenshots + layout-shift check
 ```
 
 | Path | What it is |

@@ -2,7 +2,7 @@
   const QT = (window.QT = window.QT || {});
 
   const DEFAULTS = {
-    skin: 'classic',
+    skin: 'workbook', // v0.4; 'classic' keeps the v0.3 csv-viewer look
     fileName: 'tracker_q3',
     initials: '',
     codeSources: false, // company names -> NPC-xxx codes

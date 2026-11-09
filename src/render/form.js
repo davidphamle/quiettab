@@ -43,6 +43,8 @@
         h('td', { class: 'g-cell' }, f.required ? 'Yes' : '')
       )
     );
+    for (let r = rows.length; r < 40; r++)
+      rows.push(h('tr', { class: 'g-row empty' }, h('th', { class: 'g-num' }, String(r + 2)), h('td', { class: 'g-cell' }), h('td', { class: 'g-cell' }), h('td', { class: 'g-cell' })));
     const label = form.isFinal ? `Step ${step} · final` : form.isReview ? `Step ${step} · review next` : `Step ${step}`;
     const bar = h(
       'div',

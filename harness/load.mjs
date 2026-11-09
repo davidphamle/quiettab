@@ -41,7 +41,7 @@ export async function boot(seed = {}) {
     `<script>window.__QT_SEED=${JSON.stringify({ qt: seed }).replace(/</g, '\\u003c')}.qt;</script>` +
     `<script>${SHIM}</script>` +
     early.js.map((f) => `<script>${read(f)}</script>`).join('');
-  html = html.replace('<head>', '<head>' + startTags);
+  html = html.replace('<head>', () => '<head>' + startTags);
 
   const dom = new JSDOM(html, {
     url: 'https://www.linkedin.com/jobs/search/?keywords=product%20manager',

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Quiet Tab",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A calm, spreadsheet-style view for a busy tab.",
   "permissions": ["storage"],
   "host_permissions": ["https://www.linkedin.com/*"],
@@ -38,6 +38,7 @@
         "src/render/card.js",
         "src/render/form.js",
         "src/render/skins/classic.js",
+        "src/render/skins/workbook.js",
         "src/render/shell.js",
         "src/content/app.js",
         "src/content/main.js"

@@ -92,6 +92,7 @@ input, select { font: inherit; color: inherit; }
 
 /* form sheet */
 .f-wrap { display: flex; flex-direction: column; min-height: 100%; }
+.f-wrap > .grid { align-self: flex-start; }
 .f-cell { padding: 0 !important; }
 .f-in { width: 100%; height: calc(var(--row-h) - 1px); border: 0; padding: 0 6px; background: transparent; font: var(--cell-font); outline: none; }
 .f-in:focus { box-shadow: inset 0 0 0 2px var(--accent); }
@@ -110,7 +111,7 @@ input, select { font: inherit; color: inherit; }
     const status = skin.status(ctx);
     const main = h('div', { class: 'viewport', tabindex: '0' });
     const side = h('aside', { class: 'side' });
-    const layer = h('div', { class: 'layer' });
+    const layer = h('div', { class: 'layer skin-' + skin.id });
     const frame = h(
       'div',
       { class: 'frame skin-' + skin.id },

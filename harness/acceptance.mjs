@@ -27,10 +27,7 @@ const activeTab = (w) => {
   return t && t.getAttribute('data-tab');
 };
 const tabIds = (w) => $$(w, '[data-tab]').map((b) => b.getAttribute('data-tab'));
-const statusText = (w) => {
-  const s = $(w, '.status');
-  return s ? s.textContent : '';
-};
+const statusText = (w) => [$(w, '.status'), $(w, '.tabs')].map((e) => (e ? e.textContent : '')).join(' ');
 function snap(w) {
   const r = R(w);
   const vals = [...r.querySelectorAll('input,select,textarea')].map((e) => (e.type === 'checkbox' ? e.checked : e.value));
@@ -51,6 +48,7 @@ async function openFilter(w, key, label) {
 }
 
 export async function run(seedBase = {}) {
+  results.length = 0;
   const S = (o) => ({ ...seedBase, ...o });
   const skinName = seedBase.skin || 'classic';
 
@@ -135,7 +133,7 @@ export async function run(seedBase = {}) {
   seniorBox.checked = false;
   seniorBox.dispatchEvent(new w.Event('change', { bubbles: true }));
   check('unchecking a value filters the grid instantly', rows(w).length < before && rows(w).every((r) => cell(r, 4) !== 'Senior'));
-  check('status shows filtered count', / of 20 rows/.test(statusText(w)), statusText(w));
+  check('status shows filtered count', / of 20 rows/.test(statusText(w)) || new RegExp('Count: ' + rows(w).length + '\\b').test(statusText(w)), statusText(w));
   check('filters never touch the source list', w.document.querySelectorAll('#results [data-job-id]').length === 20 && w.__mock.searches.length === 0);
   [...R(w).querySelectorAll('.fm-link')].find((b) => b.textContent === 'Clear').click();
   check('Clear hides every row', rows(w).length === 0);
@@ -202,9 +200,9 @@ export async function run(seedBase = {}) {
   check('progress meter is non-zero on the first screen (fixture)', +modal.querySelector('progress').value > 0);
   check('opens on step 1 regardless of the meter', $('.f-step').textContent === 'Step 1');
   check('Back disabled on step 1', $$(w, '.f-bar .btn')[0].disabled);
-  const labels = $$(w, '.f-wrap tbody tr td:nth-child(2)').map((e) => e.textContent);
+  const labels = $$(w, '.f-wrap tbody tr:not(.empty) td:nth-child(2)').map((e) => e.textContent);
   check('fields read semantically', labels[0] === 'Email address' && labels[1] === 'Mobile phone number', labels);
-  check('required flagged', $$(w, '.f-wrap tbody tr td:nth-child(4)').every((e) => e.textContent === 'Yes'));
+  check('required flagged', $$(w, '.f-wrap tbody tr:not(.empty) td:nth-child(4)').every((e) => e.textContent === 'Yes'));
   const phone = $$(w, '.f-wrap .f-in')[1];
   phone.value = '0412 345 678';
   phone.dispatchEvent(new w.Event('input', { bubbles: true }));
@@ -320,7 +318,7 @@ export function report({ results, skinName }) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   process.chdir(path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'));
-  const skins = process.argv.slice(2).length ? process.argv.slice(2) : ['classic'];
+  const skins = process.argv.slice(2).length ? process.argv.slice(2) : ['workbook', 'classic'];
   let fails = 0;
   for (const s of skins) fails += report(await run({ skin: s }));
   process.exit(fails ? 1 : 0);
