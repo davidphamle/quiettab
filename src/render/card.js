@@ -29,7 +29,7 @@
       ['Org', row.org],
       ['Location', row.location],
       ['Tier', row.tier],
-      ['Posted', row.posted],
+      ['Posted', row.posted || (ok && detail.posted) || ''],
       ['Mode', row.mode],
     ];
 
@@ -65,11 +65,9 @@
         { class: 'btn' + (saved ? ' on' : ''), disabled: !ok || !detail.canSave || busy, onclick: onSave },
         saved ? 'Saved' : 'Save'
       ),
-      h(
-        'button',
-        { class: 'btn primary', disabled: !ok || !detail.canApply || busy, onclick: onOpen },
-        ok && !detail.easy ? 'Open source' : 'Open form'
-      )
+      ok && !detail.easy
+        ? h('button', { class: 'btn primary ext', disabled: !detail.canApply || busy, title: 'Opens in a new tab', onclick: onOpen }, 'Open link', h('span', { html: icons.ext }))
+        : h('button', { class: 'btn primary', disabled: !ok || !detail.canApply || busy, onclick: onOpen }, 'Open form')
     );
 
     target.replaceChildren(h('div', { class: 'card' }, head, notes, foot));

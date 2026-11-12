@@ -201,14 +201,31 @@
     );
   }
 
-  // ---------- apply dialog ----------
-  function applyModal() {
+  // ---------- dialogs ----------
+  // Every dialog the source has open. Armour hides all of them, so each one
+  // must be redrawn by the overlay or it is an invisible wall: the apply form
+  // becomes the Form sheet, anything else (the "Share your profile?" step
+  // before an external link, "Save this application?", ...) becomes a prompt.
+  function openModals() {
     const open = [];
-    for (const s of S.modal) for (const el of document.querySelectorAll(s)) if (!open.includes(el)) open.push(el);
-    // The one holding form controls; skips "Save this application?" and
-    // other confirm dialogs layered on top.
-    return open.find((m) => m.isConnected && m.querySelector('input:not([type="hidden"]), select, textarea')) || null;
+    for (const s of S.modal) for (const el of document.querySelectorAll(s)) if (!open.includes(el) && el.isConnected && (el.tagName !== 'DIALOG' || el.open)) open.push(el);
+    return open;
   }
+  // An application form: real input controls (a settings switch does not
+  // count) and a way forward through pages.
+  function isApplyForm(m) {
+    const ctrl = [...m.querySelectorAll('input:not([type="hidden"]), select, textarea')].some((e) => e.getAttribute('role') !== 'switch');
+    return ctrl && (/\d+\s*\/\s*\d+\s*pages?/i.test(text(m)) || !!primaryBtn(m));
+  }
+  function applyModal() {
+    return openModals().find(isApplyForm) || null;
+  }
+  function promptModal() {
+    const others = openModals().filter((m) => !isApplyForm(m));
+    return others[others.length - 1] || null;
+  }
+  const ACTION = /^(continue|cancel|discard|save|yes|no|done|ok|close|not now|got it|submit)$/i;
+  let promptEls = { toggles: [], actions: [] };
   const BTN = (m, words) =>
     [...m.querySelectorAll('button')].find((b) => {
       const s = (label(b) + ' ' + text(b)).toLowerCase();
@@ -275,9 +292,11 @@
       const body = q(pane, S.detailBody);
       const save = q(pane, S.saveBtn);
       const apply = q(pane, S.applyBtn);
+      const ago = [...pane.querySelectorAll('p')].filter((x) => !body || !body.contains(x)).map(text).join(' \u00b7 ').match(AGO);
       return {
         id: viewId(link),
         title,
+        posted: ago ? ago[1] : '',
         notes: body ? blocks(body) : [],
         saved: !!save && (save.getAttribute('aria-pressed') === 'true' || /^(unsave|saved)\b/i.test(label(save)) || /^saved$/i.test(text(save))),
         canSave: !!save,
@@ -354,6 +373,44 @@
         steps: pages ? +pages[2] : null,
         fields,
       };
+    },
+
+    // A non-form dialog, described in the tool's vocabulary. Known ones get
+    // canonical wording; unknown ones keep their title unless it names the
+    // site's subject, and always offer Cancel.
+    readPrompt() {
+      const m = promptModal();
+      if (!m) return (promptEls = { toggles: [], actions: [] }), null;
+      const head = m.querySelector('#dialog-header, header, [id$="-header"]');
+      const raw = text((head && head.querySelector('h1,h2,h3')) || head || m.querySelector('h1,h2,h3'));
+      const share = /share your profile/i.test(raw);
+      const title = share ? 'Share your profile?' : !raw || /linkedin|\bjobs?\b|appl|recruit|hir(e|ing)/i.test(raw) ? 'Confirm' : raw;
+      const toggles = [...m.querySelectorAll('input[type="checkbox"]')].map((el) => {
+        const l = labelFor(m, el);
+        return { el, on: el.checked, label: share ? 'Share my profile when I continue' : l && !/^tap to toggle/i.test(l) && !/linkedin|\bjobs?\b/i.test(l) ? l : 'Option' };
+      });
+      const actions = [];
+      for (const b of m.querySelectorAll('button')) {
+        const t = text(b);
+        if (!t && /^(dismiss|close)\b/i.test(label(b))) actions.unshift({ el: b, label: 'Cancel', cancel: true });
+        else if (ACTION.test(t)) actions.push({ el: b, label: t, cancel: /^(cancel|not now|close)$/i.test(t) });
+      }
+      if (!actions.some((a) => a.cancel)) miss('promptCancel');
+      promptEls = { toggles, actions };
+      return {
+        title,
+        body: share ? 'Continuing opens the link in a new tab.' : '',
+        toggles: toggles.map((t) => ({ label: t.label, on: t.on })),
+        actions: actions.map((a) => ({ label: a.label, cancel: !!a.cancel })),
+      };
+    },
+    promptAct(i) {
+      const a = promptEls.actions[i];
+      if (a && a.el.isConnected) a.el.click();
+    },
+    promptToggle(i) {
+      const t = promptEls.toggles[i];
+      if (t && t.el.isConnected) t.el.click();
     },
 
     setField(field, value) {

@@ -179,7 +179,7 @@
       renderList();
     }
     if (l === 'Easy Apply to this job') openModal(j);
-    if (l === 'Apply on company website') M.externalOpened = j[0];
+    if (l === 'Apply on company website') openShare(j);
   });
 
   pager.addEventListener('click', (e) => {
@@ -295,6 +295,38 @@
     else return;
     paintModal();
   });
+  // External apply: a "Share your profile?" step first (live, 13 Nov 2026).
+  // Continue opens the company site in a new tab; Dismiss does nothing.
+  let share = null;
+  function openShare(j) {
+    share = document.createElement('dialog');
+    share.setAttribute('data-testid', 'dialog');
+    share.setAttribute('aria-labelledby', 'dialog-header');
+    share.innerHTML = `
+      <header id="dialog-header"><h2>Share your profile?</h2><button type="button" aria-label="Dismiss"></button></header>
+      <div data-testid="dialog-content">
+        <button type="button">David Pham Le</button>
+        <p>Increase your chance of being viewed</p>
+        <p>Share your full profile with the job poster when you click apply.</p>
+        <label><input type="checkbox" role="switch" id="_r_2a_" aria-label="Tap to toggle setting" checked> On</label>
+      </div>
+      <footer><button type="button">Continue</button></footer>`;
+    share.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.getAttribute('aria-label') === 'Dismiss') M.shareDismissed = j[0];
+      else if (b.textContent.trim() === 'Continue') {
+        M.externalOpened = j[0];
+        M.sharedProfile = share.querySelector('input').checked;
+      } else return;
+      try { share.close(); } catch (_) {}
+      share.remove();
+      share = null;
+    });
+    show(share);
+  }
+  M.share = () => share;
+
   // Escape on a modal dialog: the browser fires cancel; the site prompts.
   document.addEventListener('cancel', () => (M.cancelled = (M.cancelled || 0) + 1), true);
 

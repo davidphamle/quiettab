@@ -5,7 +5,7 @@
   const { h, icons } = QT.ui;
 
   const css = `
-.frame, .layer { --chrome-h: 78px; --tabs-h: 30px; --status-h: 22px; --side-w: 380px;
+.frame, .layer, .prompt-layer { --chrome-h: 78px; --tabs-h: 30px; --status-h: 22px; --side-w: 380px;
   --ui-font: "Segoe UI", system-ui, -apple-system, sans-serif;
   --cell-font: 12.5px/1 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
   --hdr-font: 11px/1 ui-monospace, Menlo, Consolas, monospace;

@@ -67,11 +67,19 @@ input, select { font: inherit; color: inherit; }
 .fm-foot { display: flex; justify-content: flex-end; padding: 8px 14px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
 
 /* buttons */
-.btn { height: 28px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--sheet-bg); }
+.btn { height: 28px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--sheet-bg); color: var(--ink); transition: background-color .08s, box-shadow .08s; }
 .btn:hover:not([disabled]) { background: var(--hover); }
+.btn:active:not([disabled]) { background: var(--line-strong); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not([disabled]) { background: color-mix(in srgb, var(--accent) 88%, #000); border-color: color-mix(in srgb, var(--accent) 88%, #000); }
+.btn.primary:active:not([disabled]) { background: color-mix(in srgb, var(--accent) 76%, #000); border-color: color-mix(in srgb, var(--accent) 76%, #000); box-shadow: inset 0 1px 2px rgba(0,0,0,.25); }
 .btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.btn.on:hover:not([disabled]) { background: color-mix(in srgb, var(--accent-soft) 85%, var(--accent)); }
+.btn:focus-visible, .icon-btn:focus-visible, .pg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn[disabled] { opacity: .45; }
+.btn.ext { display: inline-flex; align-items: center; gap: 6px; }
+.btn.ext svg { width: 13px; height: 13px; }
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
 .icon-btn { width: 28px; height: 28px; border-radius: var(--radius); display: inline-grid; place-items: center; color: var(--ink-2); }
 .icon-btn:hover { background: var(--hover); }
 
@@ -100,6 +108,22 @@ input, select { font: inherit; color: inherit; }
 .f-bar { position: sticky; bottom: 0; left: 0; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel-bg); border-top: 1px solid var(--line); margin-top: auto; }
 .f-step { font: var(--hdr-font); color: var(--ink-3); }
 
+/* prompts: the source's own dialogs, redrawn */
+.prompt-layer { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+.prompt-layer:empty { display: none; }
+.prompt-layer > * { pointer-events: auto; }
+.pr-scrim { position: absolute; inset: 0; background: rgba(15, 23, 42, .18); }
+.pr { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: 380px; max-width: calc(100% - 32px);
+  background: var(--panel-bg); border: 1px solid var(--line-strong); border-radius: calc(var(--radius) + 2px);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, .22); padding: 16px 18px 14px; font: 13px/1.45 var(--ui-font); color: var(--ink); }
+.pr-head { display: flex; align-items: center; justify-content: space-between; margin: -4px -8px 6px 0; }
+.pr-title { font-size: 15px; font-weight: 600; }
+.pr-body { margin: 0 0 10px; color: var(--ink-2); }
+.pr-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.pr-toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+.pr-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.mm-item.on::after { content: "✓"; margin-left: auto; color: var(--accent); }
+
 /* empty states */
 .empty-state { padding: 40px 56px; color: var(--ink-3); font: var(--cell-font); }
 .empty-hint { position: absolute; top: calc(var(--row-h) * 3 + 6px); left: 64px; max-width: 360px; padding: 12px 14px;
@@ -125,6 +149,7 @@ input, select { font: inherit; color: inherit; }
     const main = h('div', { class: 'viewport', tabindex: '0' });
     const side = h('aside', { class: 'side' });
     const layer = h('div', { class: 'layer skin-' + skin.id });
+    const promptLayer = h('div', { class: 'prompt-layer skin-' + skin.id });
     const frame = h(
       'div',
       { class: 'frame skin-' + skin.id },
@@ -133,7 +158,7 @@ input, select { font: inherit; color: inherit; }
       h('nav', { class: 'band tabs' }, tabs.el),
       h('footer', { class: 'band status' }, status.el)
     );
-    root.replaceChildren(style, frame, layer);
+    root.replaceChildren(style, frame, promptLayer, layer);
 
     let pop = null;
     const ui = {
@@ -151,9 +176,13 @@ input, select { font: inherit; color: inherit; }
       },
       openPop(el, anchor) {
         ui.closePop();
-        const r = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: 0, bottom: 0 };
-        const w = (frame.getBoundingClientRect && frame.getBoundingClientRect().width) || 1200;
-        pop = h('div', { class: 'pop', style: `left:${Math.max(4, Math.min(r.left, w - 250))}px;top:${r.bottom + 2}px` }, el);
+        const r = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: 0, top: 0, bottom: 0 };
+        const box = (frame.getBoundingClientRect && frame.getBoundingClientRect()) || {};
+        const w = box.width || 1200;
+        const vh = box.height || 800;
+        // Anchors in the lower half (the tab bar) open upwards.
+        const v = r.top > vh / 2 ? `bottom:${vh - r.top + 4}px` : `top:${r.bottom + 2}px`;
+        pop = h('div', { class: 'pop', style: `left:${Math.max(4, Math.min(r.left, w - 270))}px;${v}` }, el);
         layer.replaceChildren(pop);
         return pop;
       },
@@ -163,6 +192,36 @@ input, select { font: inherit; color: inherit; }
       },
       get popOpen() {
         return !!pop;
+      },
+      // A source dialog, redrawn as this tool's own dialog.
+      showPrompt(p, act, toggle) {
+        if (!p) return promptLayer.replaceChildren();
+        const { icons } = QT.ui;
+        // Cancel-type actions first, the last real action is primary.
+        const order = p.actions.map((a, i) => ({ ...a, i })).sort((a, b) => (b.cancel ? 1 : 0) - (a.cancel ? 1 : 0));
+        const primary = [...order].reverse().find((a) => !a.cancel);
+        promptLayer.replaceChildren(
+          h('div', { class: 'pr-scrim' }),
+          h(
+            'div',
+            { class: 'pr', role: 'dialog', 'aria-modal': 'true', 'aria-label': p.title },
+            h('div', { class: 'pr-head' }, h('span', { class: 'pr-title' }, p.title), p.actions.some((a) => a.cancel) && h('button', { class: 'icon-btn', 'aria-label': 'Close', html: icons.close, onclick: () => act(p.actions.findIndex((a) => a.cancel)) })),
+            p.body && h('p', { class: 'pr-body' }, p.body),
+            p.toggles.map((t, i) =>
+              h('label', { class: 'pr-toggle' }, h('span', null, t.label), h('input', { type: 'checkbox', role: 'switch', checked: t.on, onchange: () => toggle(i) }))
+            ),
+            h(
+              'div',
+              { class: 'pr-foot' },
+              order.map((a) => h('button', { class: 'btn' + (a === primary ? ' primary' : ''), onclick: () => act(a.i) }, a.label))
+            )
+          )
+        );
+        const f = promptLayer.querySelector('.btn.primary') || promptLayer.querySelector('.btn');
+        if (f) f.focus();
+      },
+      get promptOpen() {
+        return promptLayer.childElementCount > 0;
       },
     };
     return ui;

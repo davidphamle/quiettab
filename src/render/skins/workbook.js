@@ -12,7 +12,7 @@
   const { h, icons } = QT.ui;
 
   const css = `
-.frame, .layer { --chrome-h: 140px; --tabs-h: 38px; --status-h: 0px; --side-w: 380px;
+.frame, .layer, .prompt-layer { --chrome-h: 140px; --tabs-h: 38px; --status-h: 0px; --side-w: 380px;
   --ui-font: "Segoe UI", Roboto, system-ui, -apple-system, "Helvetica Neue", sans-serif;
   --cell-font: 13px/1 Arial, "Helvetica Neue", Helvetica, sans-serif;
   --hdr-font: 11px/1 "Segoe UI", Roboto, system-ui, sans-serif;
@@ -80,10 +80,11 @@
 .w-tab { height: 30px; padding: 0 14px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
 .w-tab:hover { background: var(--hover); }
 .w-tab.on { background: #dfe8f7; color: #1d3f7a; font-weight: 600; }
+.w-caret { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: -6px; border-radius: 4px; }
+.w-caret:hover { background: rgba(29, 63, 122, .12); }
 .w-tab svg { width: 12px; height: 12px; opacity: .7; }
 .w-pager { margin-left: auto; display: flex; align-items: center; }
 .w-agg { height: 30px; padding: 0 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
-.w-agg:hover { background: var(--hover); }
 .w-agg:empty { display: none; }
 
 /* side panel: reads as the tool's own details panel */
@@ -243,13 +244,12 @@
 
   function tabs(ctx) {
     const list = h('span', { style: 'display:contents' });
-    const agg = h('button', { class: 'w-agg' });
+    const agg = h('span', { class: 'w-agg' });
     const pg = QT.shell.pager(ctx);
     const el = h(
       'div',
       { class: 'w-tabs' },
-      h('button', { class: 'w-round', 'aria-label': 'Add sheet', html: icons.plus, onclick: () => ctx.action('noop') }),
-      h('button', { class: 'w-round', 'aria-label': 'All sheets', html: icons.lines, onclick: () => ctx.action('noop') }),
+      h('button', { class: 'w-round', 'aria-label': 'All sheets', 'aria-haspopup': 'menu', html: icons.lines, onclick: (e) => ctx.allSheets(e.currentTarget) }),
       list,
       h('span', { class: 'w-pager' }, pg.el),
       agg
@@ -257,14 +257,35 @@
     return {
       el,
       set(items, active) {
+        // The caret only on the active tab, as in a real workbook; it (or a
+        // right-click on any tab) opens that sheet's menu.
         list.replaceChildren(
-          ...items.map((t) =>
-            h('button', { class: 'w-tab' + (t.id === active ? ' on' : ''), 'data-tab': t.id, onclick: () => ctx.onTab(t.id) }, t.label, h('span', { html: icons.caret }))
-          )
+          ...items.map((t) => {
+            const on = t.id === active;
+            const b = h(
+              'button',
+              {
+                class: 'w-tab' + (on ? ' on' : ''),
+                'data-tab': t.id,
+                onclick: (e) => (on && e.target.closest('.w-caret') ? ctx.sheetMenu(t.id, b) : ctx.onTab(t.id)),
+                oncontextmenu: (e) => {
+                  e.preventDefault();
+                  ctx.sheetMenu(t.id, b);
+                },
+              },
+              t.label,
+              on && h('span', { class: 'w-caret', 'aria-label': 'Sheet options', html: icons.caret })
+            );
+            return b;
+          })
         );
       },
       setAggregate(text) {
         agg.textContent = text;
+      },
+      openSheetMenu(id) {
+        const b = list.querySelector(`[data-tab="${id}"]`);
+        if (b) ctx.sheetMenu(id, b);
       },
       setPager: pg.set,
     };

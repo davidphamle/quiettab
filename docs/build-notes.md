@@ -118,3 +118,37 @@ form open, bands stable, no page errors, both skins.
 (assumed "Unsave the job"/"Saved"), and the Back / Review / Submit button
 wording on later form pages (assumed by text). Both have fallbacks and count
 a miss if wrong.
+
+---
+
+## v0.5.1 — external links, button states, tab bar (13 Nov 2026)
+
+From the second live session:
+
+- **"Open source" did nothing.** On the live site, "Apply on company website"
+  first opens a *Share your profile?* modal (a switch and Continue). Armour
+  hid it, so the page sat behind an invisible dialog. `dom.js` now sorts the
+  site's dialogs into the apply form (real input controls plus a way through
+  pages) and everything else; everything else is redrawn as a prompt in the
+  tool's own style (title, switches, Continue / Cancel), proxied both ways.
+  Known prompts get canonical wording; unknown ones keep their title unless
+  it names the site's subject, and always offer Cancel. Panic hides prompts
+  like it hides the Form tab; Items brings them back.
+- **Phantom Form tab** came from that switch. A settings switch no longer
+  counts as a form control.
+- **Button renamed** "Open link" with an external-link icon ("Opens in a new
+  tab"); Easy Apply rows still say "Open form".
+- **Hover / pressed states.** The generic grey hover was applied to the blue
+  primary button too, putting white text on near-white. Primary, toggled and
+  plain buttons now each have hover, pressed and keyboard-focus states.
+  Measured in Chrome: contrast 4.7 rest, 5.8 hover, 7.2 pressed.
+- **Tab bar.** Removed the dead "+"; "≡" lists the sheets; the caret (on the
+  active tab only) and right-click open a sheet menu: sort by the selected
+  column, clear filters, close the details panel. Menus open upward from the
+  bottom bar. "Count" is plain text, not a dead button.
+- **Blank Posted on viewed rows.** The site drops the date from a card once
+  viewed; it is now taken from the detail pane when the row is opened and
+  remembered for the session.
+
+Checks: 130 / 113 (workbook current / legacy), 122 / 105 (classic). Visual:
+button contrast in all states, prompt on top, menu inside the window.

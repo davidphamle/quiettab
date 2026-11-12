@@ -68,6 +68,7 @@
     sigma: P('<path d="M12 3.5H4l4 4.5-4 4.5h8"/>'),
     search: P('<circle cx="7" cy="7" r="4"/><path d="m10 10 3.5 3.5"/>'),
     caret: P('<path d="m5 6.5 3 3 3-3"/>'),
+    ext: P('<path d="M9 3h4v4"/><path d="M13 3 7.5 8.5"/><path d="M11.5 9.5v3.5h-8.5v-8.5h3.5"/>'),
     left: P('<path d="m9.5 4-4 4 4 4"/>'),
     right: P('<path d="m6.5 4 4 4-4 4"/>'),
     plus: P('<path d="M8 3v10M3 8h10"/>'),

@@ -34,6 +34,9 @@
   let lastSig = '';
   let timer = null;
   let lastMore = 0;
+  // Some source cards drop their date (once viewed); the detail pane still
+  // has it, so remember it per row once seen.
+  const postedById = {};
 
   const A = (QT.app = { state: st });
 
@@ -48,7 +51,7 @@
       org: s.codeSources ? 'NPC-' + (100 + code(r.company || '', 900)) : r.company,
       location: r.location,
       tier: QT.filters.tierOf(r.title),
-      posted: r.posted,
+      posted: r.posted || postedById[r.id] || '',
       mode: r.easy ? 'Form' : 'Source',
       status: r.state || '',
     }));
@@ -118,6 +121,8 @@
     const sheet = st.sheet;
     const m = sheet === 'form' ? null : model(sheet);
     const detail = sheet === 'items' && st.cardId ? QT.dom.readDetail() : null;
+    if (detail && detail.id && detail.posted) postedById[detail.id] = detail.posted;
+    const prompt = QT.cover.on && !st.formHidden ? QT.dom.readPrompt() : null;
     const pager = sheet === 'items' ? QT.dom.pager() : null;
 
     const sig = JSON.stringify([
@@ -129,6 +134,7 @@
       m && m.all.length,
       detail,
       pager,
+      prompt,
       form && { f: form.fields.map((f) => [f.label, f.kind, f.value, f.required]), b: form.hasBack, p: form.primaryLabel },
     ]);
     if (!force && sig === lastSig) return;
@@ -166,6 +172,7 @@
       ui.status.set('Ready', form.fields.length + ' fields');
       ui.tabs.setAggregate('');
       ui.tabs.setPager(null);
+      showPrompt(prompt);
       return;
     }
 
@@ -240,6 +247,41 @@
     const isEmptySource = sheet === 'items' && total === 0;
     ui.status.set(isEmptySource ? 'No data in this range' : 'Ready', shown === total ? `${total} rows` : `${shown} of ${total} rows`);
     ui.tabs.setAggregate(`Count: ${shown}`);
+    showPrompt(prompt);
+  }
+
+  function showPrompt(p) {
+    ui.showPrompt(
+      p,
+      (i) => {
+        QT.dom.promptAct(i);
+        schedule();
+      },
+      (i) => {
+        QT.dom.promptToggle(i);
+        schedule();
+      }
+    );
+  }
+
+  // Sheet menus for the tab bar: the list of sheets, and actions for one.
+  function sheetList() {
+    const t = [
+      { id: 'items', label: 'Items' },
+      { id: 'archive', label: 'Archive' },
+    ];
+    if (QT.dom.readApply() && !st.formHidden) t.push({ id: 'form', label: 'Form' });
+    return t;
+  }
+  function menuEl(items) {
+    const { h } = QT.ui;
+    return h(
+      'div',
+      { class: 'mmenu', role: 'menu' },
+      items.map((it) =>
+        it === '-' ? h('div', { class: 'mm-sep' }) : h('button', { class: 'mm-item' + (it.on ? ' on' : ''), role: 'menuitem', disabled: !!it.disabled, onclick: it.run }, it.label)
+      )
+    );
   }
 
   // Shown when Items has nothing to show: says how to get rows, in the
@@ -312,6 +354,7 @@
   const ctx = {
     onTab(id) {
       if (id === 'items') st.formHidden = false;
+      if (id === 'form' && (!QT.dom.readApply() || st.formHidden)) id = 'items';
       st.sheet = id;
       ui.closePop();
       render(true);
@@ -323,6 +366,32 @@
     },
     onFindEnter(v) {
       if (st.sheet === 'items' && v.trim()) QT.dom.widenSearch(v.trim());
+    },
+    allSheets(anchor) {
+      ui.openPop(
+        menuEl(sheetList().map((t) => ({ label: t.label, on: t.id === st.sheet, run: () => ctx.onTab(t.id) }))),
+        anchor
+      );
+    },
+    sheetMenu(id, anchor) {
+      const ss = st[id];
+      const go = (fn) => () => {
+        ui.closePop();
+        fn();
+        render(true);
+      };
+      const col = ss && (model(id).columns[ss.sel.c] || {});
+      const items =
+        id === 'form'
+          ? [{ label: 'Back to Items', run: () => ctx.onTab('items') }]
+          : [
+              { label: `Sort A \u2192 Z by ${col.label || 'column'}`, run: go(() => (ss.sort = { key: col.key, dir: 1 })) },
+              { label: `Sort Z \u2192 A by ${col.label || 'column'}`, run: go(() => (ss.sort = { key: col.key, dir: -1 })) },
+              '-',
+              { label: 'Clear filters', disabled: !Object.keys(ss.filters).length && !ss.find && !ss.sort, run: go(() => Object.assign(ss, { filters: {}, find: '', sort: null })) },
+              id === 'items' && { label: 'Close details panel', disabled: !st.cardId, run: go(() => (st.cardId = null)) },
+            ].filter(Boolean);
+      ui.openPop(menuEl(items), anchor);
     },
     onPage(dir) {
       if (QT.dom.goPage(dir)) {

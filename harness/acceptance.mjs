@@ -272,11 +272,73 @@ export async function run(seedBase = {}, fixture = 'current') {
   check('row status reads Applied', cell(rows(w)[0], 7) === 'Applied');
   await openRow(w, 2);
   const openBtn = $$(w, '.card-foot .btn')[1];
-  check('non-form rows offer "Open source"', openBtn.textContent === 'Open source');
+  check('non-form rows offer "Open link" (new tab)', openBtn.textContent === 'Open link' && /new tab/.test(openBtn.getAttribute('title')));
   openBtn.click();
   await wait(w, 5);
   flush(w);
-  check('Open source proxies without opening a Form sheet', w.__mock.externalOpened === '4071200103' && activeTab(w) === 'items');
+  if (CUR) {
+    check('the source\'s "Share your profile?" step is redrawn as a prompt', !!$('.pr') && $('.pr-title').textContent === 'Share your profile?');
+    check('a settings switch does not make a Form tab', !tabIds(w).includes('form') && activeTab(w) === 'items');
+    check('prompt shows the switch state and Continue / Cancel', $('.pr-toggle input').checked && $$(w, '.pr-foot .btn').map((b) => b.textContent).join() === 'Cancel,Continue');
+    check('prompt uses no source vocabulary', !/linkedin|\bjobs?\b|apply|poster/i.test($('.pr').textContent));
+    const pre = snap(w);
+    press(w, PANIC);
+    check('panic with a prompt open: byte-identical landing, source dialog untouched', snap(w) === clean && !!w.__mock.share());
+    tab(w, 'items').click();
+    check('prompt returns with Items', !!$('.pr'));
+    void pre;
+    const sw = $('.pr-toggle input');
+    sw.checked = false;
+    sw.dispatchEvent(new w.Event('change', { bubbles: true }));
+    await wait(w, 5);
+    flush(w);
+    check('switch writes through to the source', w.__mock.share().querySelector('input').checked === false && !$('.pr-toggle input').checked);
+    $$(w, '.pr-foot .btn').find((b) => b.textContent === 'Continue').click();
+    await wait(w, 5);
+    flush(w);
+    check('Continue proxies to the source (opens the link)', w.__mock.externalOpened === '4071200103' && w.__mock.sharedProfile === false);
+    check('prompt closes with the source dialog', !$('.pr') && !w.__mock.share());
+    await openRow(w, 4);
+    $$(w, '.card-foot .btn')[1].click();
+    await wait(w, 5);
+    flush(w);
+    $$(w, '.pr-foot .btn').find((b) => b.textContent === 'Cancel').click();
+    await wait(w, 5);
+    flush(w);
+    check('Cancel dismisses the source step', w.__mock.shareDismissed === '4071200105' && !$('.pr'));
+  } else check('Open link proxies without opening a Form sheet', w.__mock.externalOpened === '4071200103' && activeTab(w) === 'items');
+
+  group('Buttons & tab bar');
+  const bcss = w.QT.shell.BASE_CSS;
+  check('primary button has its own hover (never the grey generic hover)', /\.btn\.primary:hover:not\(\[disabled\]\) \{ background: color-mix\(in srgb, var\(--accent\)/.test(bcss));
+  check('buttons have a pressed state', /\.btn\.primary:active:not\(\[disabled\]\)/.test(bcss) && /\.btn:active:not\(\[disabled\]\)/.test(bcss));
+  check('buttons have a visible keyboard focus', /\.btn:focus-visible/.test(bcss));
+  if (CUR) {
+    await openRow(w, 0);
+    check('a row that lost its date on the source gets it from the detail pane', cell(rows(w)[0], 5) === '1 day ago' && /1 day ago/.test($('.card-meta').textContent));
+  }
+  if (w.QT.app.ui().skin.id === 'workbook') {
+    check('no dead buttons in the tab bar', !$('.w-tabs [aria-label="Add sheet"]'));
+    check('caret only on the active tab', $$(w, '.w-caret').length === 1 && !!$('[data-tab="items"] .w-caret'));
+    $('[aria-label="All sheets"]').click();
+    const names = $$(w, '.mmenu .mm-item').map((b) => b.textContent);
+    check('\u2261 lists the sheets, current one ticked', names.join() === 'Items,Archive' && $('.mmenu .mm-item.on').textContent === 'Items');
+    $$(w, '.mmenu .mm-item')[1].click();
+    check('choosing a sheet from \u2261 switches to it', activeTab(w) === 'archive' && !$('.mmenu'));
+    tab(w, 'items').click();
+    const fi2 = $('.chrome input[type="text"]');
+    fi2.value = 'Product';
+    fi2.dispatchEvent(new w.Event('input', { bubbles: true }));
+    $('[data-tab="items"] .w-caret').click();
+    const acts = $$(w, '.mmenu .mm-item').map((b) => b.textContent);
+    check('caret opens the sheet menu (sort, clear, close panel)', acts.some((a) => /^Sort A/.test(a)) && acts.includes('Clear filters') && acts.includes('Close details panel'));
+    $$(w, '.mmenu .mm-item').find((b) => b.textContent === 'Clear filters').click();
+    check('Clear filters from the sheet menu works', w.QT.app.state.items.find === '' && rows(w).length === 20);
+    tab(w, 'archive').dispatchEvent(new w.MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    check('right-click on a tab opens its menu', !!$('.mmenu') && $$(w, '.mmenu .mm-item').some((b) => b.textContent === 'Clear filters'));
+    w.QT.app.ui().closePop();
+    check('Count readout is text, not a dead button', $('.w-agg').tagName === 'SPAN');
+  }
 
   group('Loading & settings');
   w = await bootW(S({}));
