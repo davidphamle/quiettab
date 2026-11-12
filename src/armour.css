@@ -3,8 +3,9 @@
  * before first paint. Zero JS dependency: if every script fails, the page
  * stays blank rather than showing the source site.
  *
- * On by default. Lifts only when JS adds .qt-off to <html> (the user paused
- * the view). Nothing else may remove it.
+ * On by default. Lifts only when JS adds .qt-off to <html>: the user turned
+ * the view off, or the page is not one we cover (route.js). Nothing else may
+ * remove it.
  *
  * The page body is kept at opacity 0, NOT display:none: the source list
  * lazy-loads through IntersectionObserver, which works on layout
@@ -28,3 +29,28 @@ html:not(.qt-off) body iframe {
 /* Brand colour cannot leak through scrollbars or the overscroll area. */
 html:not(.qt-off)::-webkit-scrollbar { display: none !important; }
 html:not(.qt-off) { scrollbar-width: none !important; overflow: hidden !important; }
+
+/*
+ * The top layer. A modal <dialog> (the source's apply form is one) is drawn
+ * above everything and ignores its ancestors' opacity, so the body rule
+ * above does not reach it. Hide its contents and its backdrop here. The
+ * overlay host moves INSIDE the open modal (app.js), because a modal makes
+ * everything outside it inert; that is the one child left visible.
+ */
+html:not(.qt-off) dialog:modal {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+html:not(.qt-off) dialog:modal::backdrop { background: transparent !important; }
+html:not(.qt-off) dialog:modal > :not([data-qt-host]) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+/* Popovers (toasts, menus) also live in the top layer. Separate rule so a
+   browser without :popover-open does not drop the rules above. */
+html:not(.qt-off) :popover-open {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

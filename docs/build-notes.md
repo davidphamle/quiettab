@@ -64,3 +64,57 @@ shows initials from settings, or a plain person icon when left blank.
 
 **Checks:** 96/96 on workbook, 96/96 on classic. Visual: bands stable, no
 page errors, armour-only page blank, on both skins.
+
+---
+
+## v0.5.0 — the site's new job search, top-layer leak, toolbar panel (12 Nov 2026)
+
+First live session found three problems. All fixed; each has checks.
+
+**1. Zero rows.** LinkedIn has moved job search to `/jobs/search-results/`, a
+server-driven UI with hashed class names. None of the v0.3 selectors existed.
+Read the live DOM and rewrote `dom.js` against durable hooks only:
+cards are `div[role=button][componentkey="job-card-component-ref-<id>"]`
+(the job ID is in the key); title/company/location are plain `<p>`s; the
+detail pane is the second `data-testid="lazy-column"`; description is
+`data-testid="expandable-text-box"`; Save/Apply are found by accessible name
+("Save the job", "Easy Apply to this job", "Apply on company website");
+results are paged (`pagination-controls-*` testids). The legacy markup is
+kept as the fallback, and both have a fixture (`mock-linkedin.html` current,
+`mock-linkedin-legacy.html` legacy). The stale-pane guard now compares job IDs.
+
+**2. The apply form drew on top of the spreadsheet** with name, email and
+phone visible. It is now a native `<dialog>` opened with `showModal()`: top
+layer, so ancestor opacity (armour) does not reach it, and every element
+outside it becomes inert. Fix, verified live and in headless Chrome:
+- armour hides `dialog:modal`'s own children and its backdrop, and any
+  `:popover-open` element;
+- the overlay host moves *inside* the topmost open modal (the only
+  interactive place) and back to `<html>` when it closes. It never removes
+  or reorders the site's nodes, so the form keeps every value;
+- Escape is swallowed while inside a dialog, so it can't close the form or
+  trigger "Save this application?".
+The dialog states "N/M pages", so the Form sheet now reads "Step 2 of 3".
+
+**3. No way to navigate.** Armour covered the whole site. Now only `/jobs/*`
+is covered (`src/content/route.js`, which with `dom.js` is the adapter);
+the rest of the site behaves normally, and a route watcher covers/uncovers
+on single-page navigation. Items gains a pager bound to the site's pages,
+and an empty-state hint ("Type a search term in Find and press Enter").
+Find + Enter now navigates to the results URL, because the new search box
+is a typeahead that ignores synthetic keys.
+
+**Toolbar panel** redesigned: on/off switch, interface picker (Workbook /
+Classic, with drawn previews; arrow keys work), shortcut, tab status
+(rows + selector misses, or "Not active"), settings link. Changes apply to
+open tabs live.
+
+**Checks:** acceptance runs per skin × markup — 109/109 current, 102/102
+legacy, on both skins. Visual (real Chrome, real `showModal()`): host on
+top and typeable inside the modal, dialog content hidden, Escape kept the
+form open, bands stable, no page errors, both skins.
+
+**Still unverified live:** the saved-state label after clicking Save
+(assumed "Unsave the job"/"Saved"), and the Back / Review / Submit button
+wording on later form pages (assumed by text). Both have fallbacks and count
+a miss if wrong.

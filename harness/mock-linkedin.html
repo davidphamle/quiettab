@@ -1,251 +1,308 @@
 <!doctype html>
 <!--
-  The executable statement of what we believe the source site's job-search
-  DOM looks like. Every selector in src/content/dom.js must resolve against
-  this file. When the real site changes, this file changes with dom.js, and
-  the diff is the record.
+  CURRENT markup (/jobs/search-results/), as read from the live site on
+  12 Nov 2026. Server-driven UI: hashed class names (deliberately random
+  here, so nothing can lean on them), hooks are data-testid, componentkey
+  and accessible names. Every selector in src/content/dom.js's current-markup
+  groups must resolve against this file. When the site changes, this file
+  changes with dom.js, and the diff is the record.
 
   Behaviours modelled (each one was a bug or a design decision):
-   - detail pane loads AFTER the card click, holding the previous record for a
-     beat (stale-pane guard)
-   - results lazy-load as the list scrolls (opacity, not display:none)
-   - the apply dialog's progress meter is non-zero on step 1 (prefilled
-     contact details), so step must come from Back / "Submit application"
+   - cards are div[role=button][componentkey="job-card-component-ref-<id>"],
+     title/company/location as plain <p>s, footer chips as more <p>s
+   - detail pane loads AFTER the card click, holding the previous record for
+     a beat (stale-pane guard); it is the second lazy column and nests another
+   - results are PAGED (pagination testids), not infinite-scrolled
+   - the apply form is a native <dialog data-testid="dialog">, opened with
+     showModal() where available (top layer, makes the rest inert), shows
+     "N/M pages", and pushes /jobs/view/<id>/ while open
+   - Dismiss opens a second dialog, "Save this application?"
    - a beforeunload guard while the dialog holds typed values
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>(3) Jobs | LinkedIn</title>
+<title>Product Manager jobs | LinkedIn</title>
 <link rel="icon" href="data:,">
 <style>
   body { font: 14px sans-serif; margin: 0; color: #000; background: #f3f2ef; }
-  .scaffold-layout__list { float: left; width: 40%; }
-  .jobs-search-results-list { height: 640px; overflow: auto; }
-  .jobs-search__job-details--container { margin-left: 41%; padding: 12px; }
+  .x9a1 { display: flex; gap: 12px; padding: 8px; }
+  .x9a2 { width: 42%; height: 640px; overflow: auto; background: #fff; }
+  .x9a3 { flex: 1; background: #fff; padding: 12px; }
   .brand { background: #0a66c2; color: #fff; padding: 8px; }
+  [role="button"] { padding: 8px; border-bottom: 1px solid #ddd; cursor: pointer; }
+  dialog { width: 560px; }
   img { width: 48px; height: 48px; }
 </style>
 </head>
 <body>
-<header class="brand">
-  <input id="jobs-search-box-keyword-id-ember27" class="jobs-search-box__text-input" aria-label="Search by title, skill, or company" value="product manager">
-</header>
-<div class="scaffold-layout__list">
-  <div class="jobs-search-results-list"><ul id="results"></ul></div>
+<div id="root">
+  <header class="brand" data-testid="primary-nav">
+    <div role="search"><input data-testid="typeahead-input" placeholder="Describe the job you want" value="product manager"></div>
+  </header>
+  <main class="x9a1">
+    <div class="x9a2"><div class="i87l55 i87ivr" data-testid="lazy-column" data-component-type="LazyColumn" id="list"></div>
+      <div id="pager"></div></div>
+    <div class="x9a3"><div class="i87l55 i87k8v" data-testid="lazy-column" data-component-type="LazyColumn" id="detail"></div></div>
+  </main>
 </div>
-<div class="jobs-search__job-details--container"></div>
 
 <script>
 (function () {
   const JOBS = [
-    ['4071200101', 'Senior Product Manager', 'Harbourline Software', 'Adelaide, SA (Hybrid)', '2026-11-08', '1 day ago', true],
-    ['4071200102', 'Product Manager, Payments', 'Tidewell Financial', 'Melbourne, VIC (Remote)', '2026-11-07', '2 days ago', true],
-    ['4071200103', 'Lead Product Designer', 'Saltbush Studio', 'Adelaide, SA (On-site)', '2026-11-06', '3 days ago', false],
-    ['4071200104', 'Product Owner', 'Kestrel Mining', 'Adelaide, SA (Hybrid)', '2026-11-05', '4 days ago', true],
-    ['4071200105', 'Director of Product', 'Northwind Health', 'Sydney, NSW (Hybrid)', '2026-11-04', '5 days ago', false],
-    ['4071200106', 'Associate Product Manager', 'Brightwater Labs', 'Adelaide, SA (Hybrid)', '2026-11-04', '5 days ago', true],
-    ['4071200107', 'Principal Product Manager - Platform', 'Copperleaf Energy', 'Remote, Australia', '2026-11-03', '6 days ago', true],
-    ['4071200108', 'Product Manager', 'Orchard Lane Retail', 'Adelaide, SA (On-site)', '2026-11-02', '1 week ago', false],
-    ['4071200109', 'Senior Product Owner', 'Southbank Ports', 'Melbourne, VIC (Hybrid)', '2026-11-02', '1 week ago', true],
-    ['4071200110', 'Graduate Product Analyst', 'Pinecrest Group', 'Adelaide, SA (Hybrid)', '2026-11-01', '1 week ago', true],
-    ['4071200111', 'Head of Product', 'Marlow & Hale', 'Brisbane, QLD (Hybrid)', '2026-10-31', '1 week ago', false],
-    ['4071200112', 'Technical Product Manager', 'Harbourline Software', 'Adelaide, SA (Hybrid)', '2026-10-30', '1 week ago', true],
-    ['4071200113', 'Product Manager - Growth', 'Tamsin Logistics', 'Remote, Australia', '2026-10-29', '1 week ago', true],
-    ['4071200114', 'Senior Product Manager, AI', 'Redfern Clinics', 'Sydney, NSW (Remote)', '2026-10-28', '1 week ago', false],
-    ['4071200115', 'Product Lead', 'Northgate Council', 'Adelaide, SA (On-site)', '2026-10-27', '2 weeks ago', true],
-    ['4071200116', 'Product Manager', 'Tidewell Financial', 'Adelaide, SA (Hybrid)', '2026-10-26', '2 weeks ago', true],
-    ['4071200117', 'Staff Product Manager', 'Copperleaf Energy', 'Perth, WA (Hybrid)', '2026-10-25', '2 weeks ago', false],
-    ['4071200118', 'Junior Business Analyst', 'Kestrel Mining', 'Adelaide, SA (On-site)', '2026-10-24', '2 weeks ago', true],
-    ['4071200119', 'VP Product', 'Saltbush Studio', 'Remote, Australia', '2026-10-23', '2 weeks ago', false],
-    ['4071200120', 'Product Manager, Data', 'Brightwater Labs', 'Melbourne, VIC (Hybrid)', '2026-10-22', '2 weeks ago', true],
-    ['4071200121', 'Senior Product Designer', 'Orchard Lane Retail', 'Adelaide, SA (Hybrid)', '2026-10-21', '2 weeks ago', true],
-    ['4071200122', 'Product Operations Manager', 'Southbank Ports', 'Adelaide, SA (Hybrid)', '2026-10-20', '3 weeks ago', false],
-    ['4071200123', 'Product Manager', 'Pinecrest Group', 'Sydney, NSW (On-site)', '2026-10-19', '3 weeks ago', true],
-    ['4071200124', 'Senior Product Manager - Mobile', 'Redfern Clinics', 'Adelaide, SA (Remote)', '2026-10-18', '3 weeks ago', true],
-    ['4071200125', 'Product Owner', 'Tamsin Logistics', 'Brisbane, QLD (Hybrid)', '2026-10-17', '3 weeks ago', false],
-    ['4071200126', 'Group Product Manager', 'Marlow & Hale', 'Melbourne, VIC (Hybrid)', '2026-10-16', '3 weeks ago', true],
-    ['4071200127', 'Product Manager, Integrations', 'Harbourline Software', 'Remote, Australia', '2026-10-15', '3 weeks ago', true],
-    ['4071200128', 'Product Analyst', 'Northgate Council', 'Adelaide, SA (On-site)', '2026-10-14', '3 weeks ago', false],
+    ['4071200101', 'Senior Product Manager', 'Harbourline Software', 'Adelaide, SA (Hybrid)', '1 day ago', true],
+    ['4071200102', 'Product Manager, Payments', 'Tidewell Financial', 'Melbourne, VIC (Remote)', '2 days ago', true],
+    ['4071200103', 'Lead Product Designer', 'Saltbush Studio', 'Adelaide, SA (On-site)', '3 days ago', false],
+    ['4071200104', 'Product Owner', 'Kestrel Mining', 'Adelaide, SA (Hybrid)', '4 days ago', true],
+    ['4071200105', 'Director of Product', 'Northwind Health', 'Sydney, NSW (Hybrid)', '5 days ago', false],
+    ['4071200106', 'Associate Product Manager', 'Brightwater Labs', 'Adelaide, SA (Hybrid)', '5 days ago', true],
+    ['4071200107', 'Principal Product Manager - Platform', 'Copperleaf Energy', 'Remote, Australia', '6 days ago', true],
+    ['4071200108', 'Product Manager', 'Orchard Lane Retail', 'Adelaide, SA (On-site)', '1 week ago', false],
+    ['4071200109', 'Senior Product Owner', 'Southbank Ports', 'Melbourne, VIC (Hybrid)', '1 week ago', true],
+    ['4071200110', 'Graduate Product Analyst', 'Pinecrest Group', 'Adelaide, SA (Hybrid)', '1 week ago', true],
+    ['4071200111', 'Head of Product', 'Marlow & Hale', 'Brisbane, QLD (Hybrid)', '1 week ago', false],
+    ['4071200112', 'Technical Product Manager', 'Harbourline Software', 'Adelaide, SA (Hybrid)', '1 week ago', true],
+    ['4071200113', 'Product Manager - Growth', 'Tamsin Logistics', 'Remote, Australia', '1 week ago', true],
+    ['4071200114', 'Senior Product Manager, AI', 'Redfern Clinics', 'Sydney, NSW (Remote)', '1 week ago', false],
+    ['4071200115', 'Product Lead', 'Northgate Council', 'Adelaide, SA (On-site)', '2 weeks ago', true],
+    ['4071200116', 'Product Manager', 'Tidewell Financial', 'Adelaide, SA (Hybrid)', '2 weeks ago', true],
+    ['4071200117', 'Staff Product Manager', 'Copperleaf Energy', 'Perth, WA (Hybrid)', '2 weeks ago', false],
+    ['4071200118', 'Junior Business Analyst', 'Kestrel Mining', 'Adelaide, SA (On-site)', '2 weeks ago', true],
+    ['4071200119', 'VP Product', 'Saltbush Studio', 'Remote, Australia', '2 weeks ago', false],
+    ['4071200120', 'Product Manager, Data', 'Brightwater Labs', 'Melbourne, VIC (Hybrid)', '2 weeks ago', true],
+    ['4071200121', 'Senior Product Designer', 'Orchard Lane Retail', 'Adelaide, SA (Hybrid)', '2 weeks ago', true],
+    ['4071200122', 'Product Operations Manager', 'Southbank Ports', 'Adelaide, SA (Hybrid)', '3 weeks ago', false],
+    ['4071200123', 'Product Manager', 'Pinecrest Group', 'Sydney, NSW (On-site)', '3 weeks ago', true],
+    ['4071200124', 'Senior Product Manager - Mobile', 'Redfern Clinics', 'Adelaide, SA (Remote)', '3 weeks ago', true],
+    ['4071200125', 'Product Owner', 'Tamsin Logistics', 'Brisbane, QLD (Hybrid)', '3 weeks ago', false],
+    ['4071200126', 'Group Product Manager', 'Marlow & Hale', 'Melbourne, VIC (Hybrid)', '3 weeks ago', true],
+    ['4071200127', 'Product Manager, Integrations', 'Harbourline Software', 'Remote, Australia', '3 weeks ago', true],
+    ['4071200128', 'Product Analyst', 'Northgate Council', 'Adelaide, SA (On-site)', '3 weeks ago', false],
   ];
-  const state = { saved: {}, applied: {}, loaded: 20, current: null };
-  const M = (window.__mock = { state, unloadAttempts: 0, searches: [], delay: 25, removedModals: 0 });
+  const PAGE = 20;
+  const state = { saved: {}, applied: {}, viewed: {}, page: 1, current: null };
+  const M = (window.__mock = { state, unloadAttempts: 0, searches: [], delay: 25, removedModals: 0, kind: 'current' });
 
   window.addEventListener('beforeunload', (e) => {
-    if (document.querySelector('[role="dialog"]')) {
+    if (document.querySelector('dialog[open]')) {
       M.unloadAttempts++;
       e.preventDefault();
       e.returnValue = '';
     }
   });
 
-  const results = document.getElementById('results');
-  const list = document.querySelector('.jobs-search-results-list');
-  const pane = document.querySelector('.jobs-search__job-details--container');
+  const list = document.getElementById('list');
+  const pager = document.getElementById('pager');
+  const detail = document.getElementById('detail');
+  const cls = () => 'i87' + Math.random().toString(36).slice(2, 5);
 
-  function footer(j) {
-    const id = j[0];
-    const st = state.applied[id] ? 'Applied' : state.saved[id] ? 'Saved' : '';
-    return `<li><time datetime="${j[4]}">${j[5]}</time></li>` +
-      (st ? `<li class="job-card-container__footer-job-state">${st}</li>` : '') +
-      (j[6] ? '<li><span>Easy Apply</span></li>' : '');
-  }
   function cardHTML(j) {
-    return `<li data-occludable-job-id="${j[0]}" class="jobs-search-results__list-item">
-      <div class="job-card-container job-card-container--clickable" data-job-id="${j[0]}">
-        <img alt="${j[2]} logo" src="data:,">
-        <div class="artdeco-entity-lockup__title"><a class="job-card-list__title--link" href="/jobs/view/${j[0]}/" aria-label="${j[1]}"><strong>${j[1]}</strong></a></div>
-        <div class="artdeco-entity-lockup__subtitle"><span>${j[2]}</span></div>
-        <ul class="job-card-container__metadata-wrapper"><li>${j[3]}</li></ul>
-        <ul class="job-card-container__footer-wrapper">${footer(j)}</ul>
-      </div></li>`;
+    const id = j[0];
+    const foot = [];
+    if (state.applied[id]) foot.push('<p class="' + cls() + '">Applied</p>');
+    else if (state.saved[id]) foot.push('<p class="' + cls() + '">Saved</p>');
+    else if (state.viewed[id]) foot.push('<p class="' + cls() + '">Viewed</p>');
+    else foot.push(`<p class="${cls()}"><span class="vh">Posted ${j[4]}</span><span aria-hidden="true">${j[4]}</span></p>`);
+    if (j[5]) foot.push('<p class="' + cls() + '"> · </p><p class="' + cls() + '">Easy Apply</p>');
+    return `<div data-display-contents="true"><div><div data-display-contents="true">
+      <div role="button" tabindex="0" componentkey="job-card-component-ref-${id}" class="${cls()}">
+        <div componentkey="${cls()}${cls()}"><div><figure aria-hidden="true"><img alt="" src="data:,"></figure>
+          <div><div><div><div data-display-contents="true">
+            <p class="${cls()}"><span class="vh">${j[1]} (Verified job)</span><span aria-hidden="true">${j[1]}</span></p></div>
+            <div><p class="${cls()}">${j[2]}</p></div>
+            <p class="${cls()}">${j[3]}</p></div>
+            <div><button type="button" aria-label="Dismiss ${j[1]} job"><span></span></button></div></div>
+          <div><p class="${cls()}">4 connections work here</p>${foot.join('')}</div></div>
+        </div></div></div></div></div>
+      </div>`;
   }
   function renderList() {
-    results.innerHTML = JOBS.slice(0, state.loaded).map(cardHTML).join('');
-    // an occluded placeholder, as the real list keeps off-screen cards empty
-    results.insertAdjacentHTML('beforeend', '<li data-occludable-job-id="4071299999"></li>');
-  }
-  function refreshCard(id) {
-    const j = JOBS.find((x) => x[0] === id);
-    const li = results.querySelector(`[data-occludable-job-id="${id}"]`);
-    if (li) li.querySelector('.job-card-container__footer-wrapper').innerHTML = footer(j);
+    const start = (state.page - 1) * PAGE;
+    list.innerHTML = JOBS.slice(start, start + PAGE).map(cardHTML).join('<hr role="presentation">');
+    const pages = Math.ceil(JOBS.length / PAGE);
+    pager.innerHTML =
+      `<button data-testid="pagination-controls-prev-button-${state.page > 1 ? 'visible' : 'hidden'}" aria-label="Previous"></button>
+       <ul data-testid="pagination-controls-list">` +
+      Array.from({ length: pages }, (_, i) => `<li><button data-testid="pagination-indicator-${i}" aria-label="Page ${i + 1}" ${i + 1 === state.page ? 'aria-current="true"' : ''}>${i + 1}</button></li>`).join('') +
+      `</ul><button data-testid="pagination-controls-next-button-${state.page < pages ? 'visible' : 'hidden'}" aria-label="Next"></button>`;
   }
 
   function renderDetail(j) {
     const id = j[0];
     const saved = !!state.saved[id];
-    pane.innerHTML = `
-      <div class="jobs-details">
-        <h1 class="t-24 job-details-jobs-unified-top-card__job-title"><a href="/jobs/view/${id}/">${j[1]}</a></h1>
-        <div class="job-details-jobs-unified-top-card__company-name">${j[2]}</div>
-        <button class="jobs-save-button artdeco-button" aria-pressed="${saved}" aria-label="${saved ? 'Saved' : 'Save'} ${j[1]} at ${j[2]}"><span>${saved ? 'Saved' : 'Save'}</span></button>
-        ${state.applied[id] ? '<span>Applied</span>' : `<button class="jobs-apply-button artdeco-button artdeco-button--primary" aria-label="${j[6] ? 'Easy Apply to' : 'Apply to'} ${j[1]} at ${j[2]}"><span>${j[6] ? 'Easy Apply' : 'Apply'}</span></button>`}
-        <article class="jobs-description__container"><div id="job-details" class="jobs-box__html-content">
+    detail.innerHTML = `
+      <div><button aria-label="Back to results list"></button>
+        <p class="${cls()}"><a href="https://www.linkedin.com/company/x/life/">${j[2]}</a></p>
+        <p class="${cls()}"><a href="https://www.linkedin.com/jobs/view/${id}/?trk=abc">${j[1]}</a></p>
+        <p class="${cls()}">${j[3]} · ${j[4]} · 60 people clicked apply</p>
+        ${state.applied[id] ? '<p>Applied</p>' : `<button componentkey="${cls()}" aria-label="${j[5] ? 'Easy Apply to this job' : 'Apply on company website'}"><span>${j[5] ? 'Easy Apply' : 'Apply'}</span></button>`}
+        <button componentkey="${cls()}" aria-label="${saved ? 'Unsave the job' : 'Save the job'}"><span>${saved ? 'Saved' : 'Save'}</span></button>
+        <div class="i87l55" data-testid="lazy-column" data-component-type="LazyColumn">
           <h2>About the job</h2>
-          <p>${j[2]} is hiring a ${j[1]} to join the team in ${j[3].split(',')[0]}.</p>
-          <p>You will own discovery, delivery and outcomes for a product area used by thousands of customers.</p>
-          <p><strong>What you'll do</strong></p>
-          <ul><li>Run discovery with customers and internal teams</li><li>Write clear specs and work closely with engineering</li><li>Define success metrics and report on them</li></ul>
-          <p><strong>About you</strong></p>
-          <ul><li>Experience shipping B2B SaaS products</li><li>Comfortable with data and experimentation</li><li>Strong written communication</li></ul>
-          <p>We offer flexible hours, hybrid work and a learning budget.</p>
-        </div></article>
+          <span data-testid="expandable-text-box">
+            ${j[2]} is hiring a ${j[1]} to join the team in ${j[3].split(',')[0]}.<br><br>
+            You will own discovery, delivery and outcomes for a product area used by thousands of customers.<br><br>
+            <strong>What you'll do</strong><br>
+            <ul><li>Run discovery with customers and internal teams</li><li>Write clear specs and work closely with engineering</li><li>Define success metrics and report on them</li></ul>
+            <strong>About you</strong>
+            <ul><li>Experience shipping B2B SaaS products</li><li>Comfortable with data and experimentation</li><li>Strong written communication</li></ul>
+            We offer flexible hours, hybrid work and a learning budget.
+            <button>… more</button>
+          </span>
+        </div>
       </div>`;
   }
 
-  results.addEventListener('click', (e) => {
-    const a = e.target.closest('a[href*="/jobs/view/"]');
-    const card = e.target.closest('[data-occludable-job-id]');
-    if (a) e.preventDefault();
+  list.addEventListener('click', (e) => {
+    const card = e.target.closest('[componentkey^="job-card-component-ref-"]');
     if (!card) return;
-    const j = JOBS.find((x) => x[0] === card.getAttribute('data-occludable-job-id'));
-    if (!j) return;
+    const id = card.getAttribute('componentkey').slice('job-card-component-ref-'.length);
+    const j = JOBS.find((x) => x[0] === id);
     state.current = j;
     // the previous record stays in the pane until this fires
-    setTimeout(() => state.current === j && renderDetail(j), M.delay);
+    setTimeout(() => {
+      if (state.current !== j) return;
+      state.viewed[id] = true;
+      renderDetail(j);
+    }, M.delay);
   });
 
-  pane.addEventListener('click', (e) => {
+  detail.addEventListener('click', (e) => {
     const j = state.current;
     if (!j) return;
-    if (e.target.closest('.jobs-save-button')) {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const l = b.getAttribute('aria-label') || '';
+    if (l === 'Save the job' || l === 'Unsave the job') {
       state.saved[j[0]] = !state.saved[j[0]];
       renderDetail(j);
-      refreshCard(j[0]);
-    }
-    if (e.target.closest('.jobs-apply-button')) {
-      if (j[6]) openModal(j);
-      else M.externalOpened = j[0];
-    }
-    if (e.target.closest('a')) e.preventDefault();
-  });
-
-  list.addEventListener('scroll', () => {
-    if (state.loaded < JOBS.length) {
-      state.loaded = Math.min(JOBS.length, state.loaded + 10);
       renderList();
     }
+    if (l === 'Easy Apply to this job') openModal(j);
+    if (l === 'Apply on company website') M.externalOpened = j[0];
   });
 
-  const header = document.getElementById('jobs-search-box-keyword-id-ember27');
-  header.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') M.searches.push(header.value);
+  pager.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const t = b.getAttribute('data-testid');
+    if (t === 'pagination-controls-next-button-visible') state.page++;
+    else if (t === 'pagination-controls-prev-button-visible') state.page--;
+    else return;
+    renderList();
   });
 
   // ---- apply dialog ----
   const answers = { email: 'me@example.com', phone: '0400 000 000', years: '', rights: '', follow: true };
   let step = 1;
   let modal = null;
+  let backPath = null;
+  function show(d) {
+    document.getElementById('root').appendChild(d);
+    if (typeof d.showModal === 'function') {
+      try {
+        d.showModal();
+        return;
+      } catch (_) {}
+    }
+    d.setAttribute('open', '');
+  }
   function openModal(j) {
     step = 1;
-    modal = document.createElement('div');
-    modal.className = 'artdeco-modal jobs-easy-apply-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-labelledby', 'jobs-apply-header');
+    modal = document.createElement('dialog');
+    modal.className = cls();
+    modal.setAttribute('data-testid', 'dialog');
+    modal.setAttribute('aria-labelledby', 'dialog-header');
     modal.dataset.job = j[0];
-    document.body.appendChild(modal);
+    backPath = location.pathname + location.search;
+    try { history.pushState({}, '', '/jobs/view/' + j[0] + '/'); } catch (_) {}
+    show(modal);
     paintModal();
   }
   function paintModal() {
-    const pct = { 1: 33, 2: 67, 3: 100 }[step];
     let body = '';
     if (step === 1)
       body = `
-        <div data-test-form-element class="fb-dash-form-element"><label for="am-email">Email address<span aria-hidden="true">*</span></label>
-          <select id="am-email" required><option value="me@example.com">me@example.com</option><option value="work@example.com">work@example.com</option></select></div>
-        <div data-test-form-element class="fb-dash-form-element"><label for="am-phone">Mobile phone number*</label>
-          <input id="am-phone" type="text" required value="${answers.phone}"></div>`;
+        <h3>Contact info</h3>
+        <div data-testid="lazy-column" data-component-type="LazyColumn">
+          <div><label for="_r_j_">Email address*</label>
+            <select id="_r_j_" required><option value="me@example.com">me@example.com</option><option value="work@example.com">work@example.com</option></select></div>
+          <div><label for="_r_n_">Mobile phone number*</label>
+            <input id="_r_n_" type="tel" required value="${answers.phone}"></div>
+        </div>`;
     if (step === 2)
       body = `
-        <div data-test-form-element class="fb-dash-form-element"><label for="am-years">How many years of product management experience do you have?</label>
-          <input id="am-years" type="text" aria-required="true" value="${answers.years}"></div>
-        <fieldset data-test-form-element class="fb-dash-form-element"><legend>Do you have the right to work in Australia?*</legend>
-          <input type="radio" id="am-r1" name="rights" value="Yes" ${answers.rights === 'Yes' ? 'checked' : ''}><label for="am-r1">Yes</label>
-          <input type="radio" id="am-r2" name="rights" value="No" ${answers.rights === 'No' ? 'checked' : ''}><label for="am-r2">No</label></fieldset>
-        <div data-test-form-element class="fb-dash-form-element"><label for="am-cv">Resume</label><input id="am-cv" type="file"></div>`;
+        <h3>Additional questions</h3>
+        <div><label for="_r_q_">How many years of product management experience do you have?</label>
+          <input id="_r_q_" type="text" aria-required="true" value="${answers.years}"></div>
+        <fieldset><legend>Do you have the right to work in Australia?*</legend>
+          <input type="radio" id="_r_a_" name="_r_rights_" value="Yes" ${answers.rights === 'Yes' ? 'checked' : ''}><label for="_r_a_">Yes</label>
+          <input type="radio" id="_r_b_" name="_r_rights_" value="No" ${answers.rights === 'No' ? 'checked' : ''}><label for="_r_b_">No</label></fieldset>
+        <div><label for="_r_cv_">Resume</label><input id="_r_cv_" type="file"></div>`;
     if (step === 3)
       body = `
-        <div data-test-form-element class="fb-dash-form-element"><label for="am-follow">Follow this company to stay up to date</label>
-          <input id="am-follow" type="checkbox" ${answers.follow ? 'checked' : ''}></div>`;
-    const primary = step === 1 ? 'Continue to next step' : step === 2 ? 'Review your application' : 'Submit application';
+        <h3>Review your application</h3>
+        <div><label for="_r_f_">Follow this company to stay up to date</label>
+          <input id="_r_f_" type="checkbox" ${answers.follow ? 'checked' : ''}></div>`;
+    const primary = step === 1 ? 'Next' : step === 2 ? 'Review' : 'Submit application';
     modal.innerHTML = `
-      <h2 id="jobs-apply-header">Apply</h2>
-      <progress max="100" value="${pct}" aria-label="Your job application progress is at ${pct} percent."></progress>
-      <form>${body}</form>
+      <header id="dialog-header"><h2>Apply to ${JOBS.find((x) => x[0] === modal.dataset.job)[2]}</h2>
+        <button type="button" aria-label="Dismiss"></button></header>
+      <div data-testid="dialog-content">
+        <svg role="img"><rect width="${step * 25}" height="4"></rect></svg><span>${step}/3 pages</span>
+        <form>${body}</form>
+      </div>
       <footer>
-        ${step > 1 ? '<button type="button" aria-label="Back to previous step" class="artdeco-button--secondary">Back</button>' : ''}
-        <button type="button" aria-label="${primary}" class="artdeco-button--primary">${step === 3 ? 'Submit application' : step === 2 ? 'Review' : 'Next'}</button>
+        ${step > 1 ? '<button type="button">Back</button>' : ''}
+        <button type="button">${primary}</button>
       </footer>`;
     modal.querySelector('form').addEventListener('input', capture);
     modal.querySelector('form').addEventListener('change', capture);
   }
   function capture(e) {
     const t = e.target;
-    if (t.id === 'am-email') answers.email = t.value;
-    if (t.id === 'am-phone') answers.phone = t.value;
-    if (t.id === 'am-years') answers.years = t.value;
-    if (t.name === 'rights') answers.rights = t.value;
-    if (t.id === 'am-follow') answers.follow = t.checked;
+    if (t.id === '_r_j_') answers.email = t.value;
+    if (t.id === '_r_n_') answers.phone = t.value;
+    if (t.id === '_r_q_') answers.years = t.value;
+    if (t.name === '_r_rights_') answers.rights = t.value;
+    if (t.id === '_r_f_') answers.follow = t.checked;
+  }
+  function closeModal() {
+    if (!modal) return;
+    try { modal.close(); } catch (_) {}
+    modal.remove();
+    modal = null;
+    try { history.pushState({}, '', backPath); } catch (_) {}
   }
   document.body.addEventListener('click', (e) => {
     if (!modal || !modal.contains(e.target)) return;
     const b = e.target.closest('button');
     if (!b) return;
-    const label = b.getAttribute('aria-label');
-    if (label === 'Back to previous step') step--;
-    else if (label === 'Submit application') {
+    const t = b.textContent.trim();
+    if (b.getAttribute('aria-label') === 'Dismiss') {
+      M.dismissAttempts = (M.dismissAttempts || 0) + 1;
+      return;
+    }
+    if (t === 'Back') step--;
+    else if (t === 'Submit application') {
       state.applied[modal.dataset.job] = true;
-      refreshCard(modal.dataset.job);
-      modal.remove();
+      closeModal();
       M.removedModals++;
-      modal = null;
+      renderList();
       if (state.current) renderDetail(state.current);
       return;
-    } else step++;
+    } else if (t === 'Next' || t === 'Review') step++;
+    else return;
     paintModal();
   });
+  // Escape on a modal dialog: the browser fires cancel; the site prompts.
+  document.addEventListener('cancel', () => (M.cancelled = (M.cancelled || 0) + 1), true);
+
   M.answers = answers;
-  M.dismissModal = () => { if (modal) { modal.remove(); modal = null; } };
+  M.modal = () => document.querySelector('dialog[data-testid="dialog"]');
+  M.field = (k) => M.modal() && M.modal().querySelector({ phone: '#_r_n_', years: '#_r_q_' }[k]);
+  M.cardCount = () => list.querySelectorAll('[componentkey^="job-card-component-ref-"]').length;
+  M.dismissModal = closeModal;
 
   renderList();
 })();

@@ -97,11 +97,24 @@ input, select { font: inherit; color: inherit; }
 .f-in { width: 100%; height: calc(var(--row-h) - 1px); border: 0; padding: 0 6px; background: transparent; font: var(--cell-font); outline: none; }
 .f-in:focus { box-shadow: inset 0 0 0 2px var(--accent); }
 .f-chk { margin: 0 6px; }
-.f-bar { position: sticky; bottom: 0; left: 0; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel-bg); border-top: 1px solid var(--line); margin-top: auto; }
+.f-bar { position: sticky; bottom: 0; left: 0; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel-bg); border-top: 1px solid var(--line); margin-top: auto; }
 .f-step { font: var(--hdr-font); color: var(--ink-3); }
 
 /* empty states */
 .empty-state { padding: 40px 56px; color: var(--ink-3); font: var(--cell-font); }
+.empty-hint { position: absolute; top: calc(var(--row-h) * 3 + 6px); left: 64px; max-width: 360px; padding: 12px 14px;
+  background: var(--panel-bg); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: 0 2px 10px rgba(15,23,42,.08); color: var(--ink-2); font: 13px/1.45 var(--ui-font); }
+.eh-title { font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+
+/* pager */
+.pager { display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; color: var(--ink-2); }
+.pager:empty { display: none; }
+.pager .pg-btn { width: 26px; height: 26px; border-radius: var(--radius); display: inline-grid; place-items: center; color: var(--ink-2); }
+.pager .pg-btn:hover:not([disabled]) { background: var(--hover); }
+.pager .pg-btn[disabled] { opacity: .35; }
+.pager .pg-btn svg { width: 14px; height: 14px; }
+.pager .pg-n { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
 `;
 
   function mount(root, skin, ctx) {
@@ -155,5 +168,23 @@ input, select { font: inherit; color: inherit; }
     return ui;
   }
 
-  QT.shell = { mount, BASE_CSS };
+  // Shared pager control for skins: "< Page 2 >", bound to the source's own
+  // result pages. Hidden when the source does not page.
+  function pager(ctx) {
+    const { icons } = QT.ui;
+    const el = h('span', { class: 'pager' });
+    return {
+      el,
+      set(p) {
+        if (!p) return el.replaceChildren();
+        el.replaceChildren(
+          h('button', { class: 'pg-btn', 'aria-label': 'Previous page', disabled: !p.hasPrev, html: icons.left, onclick: () => ctx.onPage(-1) }),
+          h('span', { class: 'pg-n' }, 'Page ' + p.page),
+          h('button', { class: 'pg-btn', 'aria-label': 'Next page', disabled: !p.hasNext, html: icons.right, onclick: () => ctx.onPage(1) })
+        );
+      },
+    };
+  }
+
+  QT.shell = { mount, pager, BASE_CSS };
 })();

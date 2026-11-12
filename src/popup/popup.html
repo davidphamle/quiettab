@@ -2,24 +2,95 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Status</title>
+<title>Quiet Tab</title>
 <style>
-  /* Built to survive being seen: it reads as a file tool's status panel.
-     Nothing here names the source site, its subject, or "hiding". */
-  body { margin: 0; width: 240px; font: 12.5px/1.4 "Segoe UI", system-ui, sans-serif; color: #24292f; background: #fbfbfa; }
-  .row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #ececea; }
+  /* Built to survive being seen: a file tool's view panel. Nothing here
+     names the source site, its subject, or "hiding". */
+  :root {
+    --ink: #1f2328; --ink-2: #4b5260; --ink-3: #6b7280;
+    --line: #e5e7eb; --bg: #ffffff; --soft: #f6f7f9;
+    --accent: #2f6fde; --accent-soft: #e8effc; --ok: #2f7a4f; --warn: #a8620c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 300px; background: var(--bg); color: var(--ink); font: 13px/1.4 "Segoe UI", Roboto, system-ui, sans-serif; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  button:focus-visible, [role="switch"]:focus-visible, .skin:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  header { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--line); }
+  header img { width: 20px; height: 20px; }
+  header h1 { font-size: 14px; font-weight: 600; margin: 0; flex: 1; }
+
+  /* the switch */
+  [role="switch"] { position: relative; width: 38px; height: 22px; border-radius: 11px; background: #c9ced6; transition: background .15s; flex: 0 0 auto; }
+  [role="switch"]::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+  [role="switch"][aria-checked="true"] { background: var(--accent); }
+  [role="switch"][aria-checked="true"]::after { transform: translateX(16px); }
+  @media (prefers-reduced-motion: reduce) { [role="switch"], [role="switch"]::after { transition: none; } }
+
+  .state { padding: 10px 16px 0; color: var(--ink-3); font-size: 12px; }
+  .state b { color: var(--ink); font-weight: 600; }
+
+  section { padding: 12px 16px 14px; }
+  h2 { font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 0 0 8px; }
+
+  /* interface picker */
+  .skins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .skin { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; text-align: left; }
+  .skin:hover { border-color: #c9ced6; }
+  .skin[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-soft); }
+  .skin .name { font-weight: 600; font-size: 12.5px; padding: 0 2px; }
+  .skin .sub { color: var(--ink-3); font-size: 11.5px; padding: 0 2px 2px; line-height: 1.3; }
+  .thumb { height: 62px; border-radius: 4px; background: #fff; border: 1px solid var(--line); overflow: hidden; display: grid; }
+  .body.off .skins { opacity: .5; }
+
+  /* thumbnails, drawn with CSS so they always match the real chrome */
+  .t-workbook { grid-template-rows: 9px 7px 6px 1fr 7px; background: #f8f9fb; }
+  .t-workbook .a { margin: 2px 4px 0; display: flex; gap: 2px; } .t-workbook .a i { width: 9px; height: 4px; background: #c4ccd8; border-radius: 1px; }
+  .t-workbook .b { margin: 1px 4px; background: #e6eaf0; border-radius: 4px; }
+  .t-workbook .c { border-top: 1px solid #dfe3e8; background: #fff; }
+  .t-workbook .g, .t-classic .g { background-color: #fff;
+    background-image: linear-gradient(#e2e4e8 1px, transparent 1px), linear-gradient(90deg, #e2e4e8 1px, transparent 1px);
+    background-size: 100% 6px, 16px 100%; border-top: 1px solid #c4c9d1; }
+  .t-workbook .d { background: #f8f9fb; border-top: 1px solid #dfe3e8; display: flex; gap: 2px; padding: 1px 4px; } .t-workbook .d i { width: 12px; background: #dfe8f7; border-radius: 2px; }
+  .t-classic { grid-template-rows: 8px 9px 1fr 6px 5px; background: #f4f4f2; }
+  .t-classic .a { margin: 2px 4px; width: 26px; background: #c9ccc8; border-radius: 1px; }
+  .t-classic .b { display: flex; gap: 2px; padding: 1px 4px; } .t-classic .b i { width: 10px; border: 1px solid #c9ccc8; border-radius: 4px; background: #fff; }
+  .t-classic .d { border-top: 1px solid #d0d0cc; display: flex; } .t-classic .d i { width: 12px; background: #fff; border-right: 1px solid #d0d0cc; }
+  .t-classic .e { border-top: 1px solid #e4e4e1; }
+
+  .rows { border-top: 1px solid var(--line); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
   .row:last-child { border-bottom: 0; }
-  .k { color: #7a828c; }
-  kbd { font: 11px ui-monospace, Menlo, Consolas, monospace; background: #fff; border: 1px solid #d0d0cc; border-radius: 3px; padding: 1px 5px; }
-  button { font: inherit; background: none; border: 0; padding: 0; color: #3d6b8c; cursor: pointer; }
-  .ok { color: #3d7a4f; } .warn { color: #a8620c; }
+  .k { color: var(--ink-3); }
+  kbd { font: 11px ui-monospace, Menlo, Consolas, monospace; background: var(--soft); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+  .link { color: var(--accent); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); }
 </style>
 </head>
 <body>
-  <div class="row"><span class="k">Archive view</span><kbd id="key">Alt+Shift+Q</kbd></div>
-  <div class="row"><span class="k">View</span><button id="pause">On</button></div>
-  <div class="row"><span class="k">Source</span><span id="health">—</span></div>
-  <div class="row"><span class="k">Settings</span><button id="opts">Open</button></div>
+  <header>
+    <img src="../../icons/32.png" alt="">
+    <h1>Quiet Tab</h1>
+    <button id="power" role="switch" aria-checked="true" aria-label="View on"></button>
+  </header>
+  <div class="state" id="state">&nbsp;</div>
+
+  <div class="body" id="body">
+    <section>
+      <h2 id="skins-label">Interface</h2>
+      <div class="skins" id="skins" role="radiogroup" aria-labelledby="skins-label"></div>
+    </section>
+
+    <div class="rows">
+      <div class="row"><span class="k">Archive view</span><kbd id="key">Alt+Shift+Q</kbd></div>
+      <div class="row"><span class="k">This tab</span><span id="health">—</span></div>
+      <div class="row"><span class="k">File name, archive sheet</span><button class="link" id="opts">Settings</button></div>
+    </div>
+  </div>
+
+  <script src="../render/util.js"></script>
+  <script src="../render/skins/workbook.js"></script>
+  <script src="../render/skins/classic.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

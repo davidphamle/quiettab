@@ -81,7 +81,8 @@
 .w-tab:hover { background: var(--hover); }
 .w-tab.on { background: #dfe8f7; color: #1d3f7a; font-weight: 600; }
 .w-tab svg { width: 12px; height: 12px; opacity: .7; }
-.w-agg { margin-left: auto; height: 30px; padding: 0 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.w-pager { margin-left: auto; display: flex; align-items: center; }
+.w-agg { height: 30px; padding: 0 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
 .w-agg:hover { background: var(--hover); }
 .w-agg:empty { display: none; }
 
@@ -243,12 +244,14 @@
   function tabs(ctx) {
     const list = h('span', { style: 'display:contents' });
     const agg = h('button', { class: 'w-agg' });
+    const pg = QT.shell.pager(ctx);
     const el = h(
       'div',
       { class: 'w-tabs' },
       h('button', { class: 'w-round', 'aria-label': 'Add sheet', html: icons.plus, onclick: () => ctx.action('noop') }),
       h('button', { class: 'w-round', 'aria-label': 'All sheets', html: icons.lines, onclick: () => ctx.action('noop') }),
       list,
+      h('span', { class: 'w-pager' }, pg.el),
       agg
     );
     return {
@@ -263,6 +266,7 @@
       setAggregate(text) {
         agg.textContent = text;
       },
+      setPager: pg.set,
     };
   }
 

@@ -38,7 +38,10 @@ sheet, filters and panic behaviour.
 
 1. `chrome://extensions` → enable **Developer mode**.
 2. **Load unpacked** → select this folder.
-3. Open a job search and click the toolbar icon to see source health.
+3. Pin the icon. Its panel has the **on/off switch**, the **interface picker**,
+   and this tab's status.
+
+Only job pages are covered; the rest of the site works as normal.
 
 ## Develop
 
@@ -51,7 +54,8 @@ CHROME=/path/to/chrome npm run visual   # screenshots + layout-shift check
 | Path | What it is |
 |---|---|
 | `src/content/dom.js` | **Every** assumption about the source site's DOM. Nothing else may contain one. |
-| `harness/mock-linkedin.html` | Executable statement of what we believe that DOM looks like. Changes with `dom.js`. |
+| `src/content/route.js` | Which URLs are covered. With `dom.js`, the whole source-site adapter. |
+| `harness/mock-linkedin.html` | Executable statement of the site's current DOM (`-legacy.html`: the old one). Changes with `dom.js`. |
 | `harness/acceptance.mjs` | Regression suite. Run before every release. |
 | `src/render/skins/` | Interface skins. Each owns its chrome bands; the grid, card and form renderers are shared. |
 

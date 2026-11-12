@@ -11,7 +11,8 @@ const check = (name, ok, info) => results.push({ section, name, ok: !!ok, info }
 const group = (s) => (section = s);
 
 let W = null; // the window under test; set on every boot
-const bootW = async (seed) => (W = await boot(seed));
+let FX = 'current';
+const bootW = async (seed, url) => (W = await boot(seed, FX, url));
 const R = (w) => (w || W).QT.app.root;
 const $ = (a, b) => (typeof a === 'string' ? R(W).querySelector(a) : R(a).querySelector(b));
 const $$ = (a, b) => [...(typeof a === 'string' ? R(W).querySelectorAll(a) : R(a).querySelectorAll(b))];
@@ -47,10 +48,12 @@ async function openFilter(w, key, label) {
   return $(w, '.fmenu');
 }
 
-export async function run(seedBase = {}) {
+export async function run(seedBase = {}, fixture = 'current') {
   results.length = 0;
+  FX = fixture;
   const S = (o) => ({ ...seedBase, ...o });
-  const skinName = seedBase.skin || 'classic';
+  const skinName = (seedBase.skin || 'classic') + ' \u00d7 ' + fixture + ' markup';
+  const CUR = fixture === 'current';
 
   // ------------------------------------------------------------------ boot
   group('Boot & armour');
@@ -71,6 +74,23 @@ export async function run(seedBase = {}) {
   check('armour: never display:none on body (keeps lazy-load alive)', !/body\s*\{[^}]*display:\s*none/.test(css));
   check('armour: imagery hidden', /img,[\s\S]*visibility: hidden !important/.test(css));
   check('armour: loaded by manifest at document_start, no JS needed', manifest.content_scripts[0].run_at === 'document_start' && manifest.content_scripts[0].css.includes('src/armour.css'));
+  check('armour: modal dialogs (top layer) hidden, backdrop transparent', /dialog:modal > :not\(\[data-qt-host\]\) \{[^}]*opacity: 0 !important/.test(css) && /dialog:modal::backdrop \{[^}]*transparent/.test(css));
+  check('armour: popovers (top layer) hidden', /:popover-open \{[^}]*opacity: 0 !important/.test(css));
+
+  group('Scope: job pages only');
+  {
+    const f = await bootW(S({}), 'https://www.linkedin.com/feed/');
+    const h = f.document.querySelector('[data-qt-host]');
+    check('other pages are left alone (armour lifted, frame hidden)', f.document.documentElement.classList.contains('qt-off') && h.style.display === 'none');
+    check('title not taken over on other pages', f.document.title !== 'tracker_q3');
+    f.history.pushState({}, '', '/jobs/search-results/?keywords=x');
+    f.QT.route.check();
+    check('navigating into job pages covers them (single-page app)', !f.document.documentElement.classList.contains('qt-off') && h.style.display === 'block' && f.document.title === skin.title('tracker_q3'));
+    f.history.pushState({}, '', '/messaging/');
+    f.QT.route.check();
+    check('navigating out uncovers again', f.document.documentElement.classList.contains('qt-off') && h.style.display === 'none');
+    w = await bootW(S({}));
+  }
 
   group('Grid');
   check('20 loaded rows rendered (occluded placeholder skipped)', rows(w).length === 20, rows(w).length);
@@ -134,7 +154,7 @@ export async function run(seedBase = {}) {
   seniorBox.dispatchEvent(new w.Event('change', { bubbles: true }));
   check('unchecking a value filters the grid instantly', rows(w).length < before && rows(w).every((r) => cell(r, 4) !== 'Senior'));
   check('status shows filtered count', / of 20 rows/.test(statusText(w)) || new RegExp('Count: ' + rows(w).length + '\\b').test(statusText(w)), statusText(w));
-  check('filters never touch the source list', w.document.querySelectorAll('#results [data-job-id]').length === 20 && w.__mock.searches.length === 0);
+  check('filters never touch the source list', w.__mock.cardCount() === 20 && w.__mock.searches.length === 0);
   [...R(w).querySelectorAll('.fm-link')].find((b) => b.textContent === 'Clear').click();
   check('Clear hides every row', rows(w).length === 0);
   [...R(w).querySelectorAll('.fm-link')].find((b) => b.textContent === 'Select all').click();
@@ -147,6 +167,7 @@ export async function run(seedBase = {}) {
   check('typing narrows locally', rows(w).length > 0 && rows(w).every((r) => /Adelaide/.test(r.textContent)) && rows(w).length < 20);
   find.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   check('Enter widens via the source search', w.__mock.searches[0] === 'Adelaide');
+  if (CUR) check('current markup: widen navigates to the results URL', (w.__navigations || [])[0] === '/jobs/search-results/?keywords=Adelaide');
 
   group('Panic landing');
   w = await bootW(S({}));
@@ -194,11 +215,20 @@ export async function run(seedBase = {}) {
   $$(w, '.card-foot .btn')[1].click();
   await wait(w, 5);
   flush(w);
-  const modal = w.document.querySelector('[role="dialog"]');
+  const modal = w.__mock.modal();
   check('Open form proxies to the source dialog', !!modal);
   check('Form sheet opens and is active', activeTab(w) === 'form');
-  check('progress meter is non-zero on the first screen (fixture)', +modal.querySelector('progress').value > 0);
-  check('opens on step 1 regardless of the meter', $('.f-step').textContent === 'Step 1');
+  if (CUR) {
+    const hn = w.document.querySelector('[data-qt-host]');
+    check('host moves inside the open modal dialog (only interactive place)', hn.parentNode === modal && modal.lastElementChild === hn);
+    const esc = new w.KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true });
+    w.dispatchEvent(esc);
+    check('Escape never reaches the dialog (no close / save prompt)', esc.defaultPrevented && !w.__mock.dismissAttempts);
+    check('opens on step 1, read from the dialog\'s own page count', $('.f-step').textContent === 'Step 1 of 3');
+  } else {
+    check('progress meter is non-zero on the first screen (fixture)', +modal.querySelector('progress').value > 0);
+    check('opens on step 1 regardless of the meter', $('.f-step').textContent === 'Step 1');
+  }
   check('Back disabled on step 1', $$(w, '.f-bar .btn')[0].disabled);
   const labels = $$(w, '.f-wrap tbody tr:not(.empty) td:nth-child(2)').map((e) => e.textContent);
   check('fields read semantically', labels[0] === 'Email address' && labels[1] === 'Mobile phone number', labels);
@@ -206,7 +236,7 @@ export async function run(seedBase = {}) {
   const phone = $$(w, '.f-wrap .f-in')[1];
   phone.value = '0412 345 678';
   phone.dispatchEvent(new w.Event('input', { bubbles: true }));
-  check('typing writes into the source field', w.__mock.answers.phone === '0412 345 678' && modal.querySelector('#am-phone').value === '0412 345 678');
+  check('typing writes into the source field', w.__mock.answers.phone === '0412 345 678' && w.__mock.field('phone').value === '0412 345 678');
   $$(w, '.f-bar .btn')[1].click();
   await wait(w, 5);
   flush(w);
@@ -218,13 +248,13 @@ export async function run(seedBase = {}) {
   rights.value = 'Yes';
   rights.dispatchEvent(new w.Event('change', { bubbles: true }));
   check('radio groups render as a select and write back', w.__mock.answers.rights === 'Yes');
-  const formSnapBefore = w.document.querySelector('#am-years').value;
+  const formSnapBefore = w.__mock.field('years').value;
   yrs.focus();
   press(w, PANIC);
   check('panic mid-form lands byte-identical', snap(w) === clean);
   check('no beforeunload fired', w.__mock.unloadAttempts === 0);
   check('source dialog left open and connected', modal.isConnected && w.__mock.removedModals === 0);
-  check('typed values intact in the source', w.document.querySelector('#am-years').value === formSnapBefore && formSnapBefore === '7');
+  check('typed values intact in the source', w.__mock.field('years').value === formSnapBefore && formSnapBefore === '7');
   check('Form tab hidden on the landing', !tabIds(w).includes('form'));
   tab(w, 'items').click();
   check('resume: Form tab returns after Items click', tabIds(w).includes('form'));
@@ -237,7 +267,8 @@ export async function run(seedBase = {}) {
   $$(w, '.f-bar .btn')[1].click();
   await wait(w, 5);
   flush(w);
-  check('submit: dialog closed by the source, back on Items', !w.document.querySelector('[role="dialog"]') && activeTab(w) === 'items');
+  check('submit: dialog closed by the source, back on Items', !w.__mock.modal() && activeTab(w) === 'items');
+  if (CUR) check('host returns to <html> when the dialog goes', w.document.querySelector('[data-qt-host]').parentNode === w.document.documentElement);
   check('row status reads Applied', cell(rows(w)[0], 7) === 'Applied');
   await openRow(w, 2);
   const openBtn = $$(w, '.card-foot .btn')[1];
@@ -249,11 +280,28 @@ export async function run(seedBase = {}) {
 
   group('Loading & settings');
   w = await bootW(S({}));
-  const vp = w.QT.app.ui().main;
-  vp.dispatchEvent(new w.Event('scroll'));
-  await wait(w, 5);
-  flush(w);
-  check('reaching the grid end loads more from the source (opacity, not display:none)', rows(w).length === 28, rows(w).length);
+  if (CUR) {
+    check('pager shows the source\'s page', /Page 1/.test($('.pager').textContent) && $('.pager [aria-label="Previous page"]').disabled);
+    $('.pager [aria-label="Next page"]').click();
+    await wait(w, 5);
+    flush(w);
+    check('next page proxies to the source pager', rows(w).length === 8 && /Page 2/.test($('.pager').textContent) && cell(rows(w)[0], 0) === 'R-0121', rows(w).length);
+    $('.pager [aria-label="Previous page"]').click();
+    await wait(w, 5);
+    flush(w);
+    check('previous page returns', rows(w).length === 20 && /Page 1/.test($('.pager').textContent));
+    w.document.getElementById('list').innerHTML = '';
+    await wait(w, 5);
+    flush(w);
+    check('empty Items explains how to fetch rows', !!$('.empty-hint') && /Find/.test($('.empty-hint').textContent));
+    check('empty hint uses no source vocabulary', !/linkedin|\bjobs?\b|apply/i.test($('.empty-hint').textContent));
+  } else {
+    const vp = w.QT.app.ui().main;
+    vp.dispatchEvent(new w.Event('scroll'));
+    await wait(w, 5);
+    flush(w);
+    check('reaching the grid end loads more from the source (opacity, not display:none)', rows(w).length === 28, rows(w).length);
+  }
   w = await bootW(S({ codeSources: true }));
   const org = cell(rows(w)[0], 2);
   check('codeSources shows NPC codes', /^NPC-\d{3}$/.test(org), org);
@@ -274,16 +322,18 @@ export async function run(seedBase = {}) {
   check('paste parser: tab-separated with header row', parsed.columns.join() === 'A,B' && parsed.rows.length === 2);
 
   group('Maintenance surface');
-  const files = walk('src').filter((f) => f.endsWith('.js') && !f.endsWith('content/dom.js'));
+  const files = walk('src').filter((f) => f.endsWith('.js') && !f.endsWith('content/dom.js') && !f.endsWith('content/route.js'));
   const leaks = files.filter((f) => /linkedin|artdeco|job-card|jobs-|\/jobs\/|easy apply|data-job|occludable/i.test(read(f)));
-  check('no source-site assumption outside dom.js', leaks.length === 0, leaks);
+  check('no source-site assumption outside dom.js / route.js', leaks.length === 0, leaks);
   const D = w.QT.dom.S;
   const doc = w.document;
   w = await bootW(S({}));
   await openRow(w, 0);
-  const mustResolve = ['list', 'card', 'cardLink', 'cardTitle', 'cardCompany', 'cardLocation', 'cardFooter', 'detail', 'detailTitle', 'detailBody', 'saveBtn', 'applyBtn', 'search'];
+  const mustResolve = CUR
+    ? ['column', 'card', 'viewLink', 'detailBody', 'saveBtn', 'applyBtn', 'search', 'pageNext', 'pageCurrent']
+    : ['lList', 'lCard', 'viewLink', 'lTitle', 'lCompany', 'lLocation', 'lFooter', 'lDetail', 'lDetailTitle', 'detailBody', 'saveBtn', 'applyBtn', 'search'];
   const unresolved = mustResolve.filter((k) => !w.QT.dom.S[k].some((s) => w.document.querySelector(s)));
-  check('every selector group resolves against the fixture', unresolved.length === 0, unresolved);
+  check(`every ${fixture}-markup selector group resolves against its fixture`, unresolved.length === 0, unresolved);
   check('selector health still zero after a full session', w.QT.health.total === 0, JSON.stringify(w.QT.health.misses));
   void D;
   void doc;
@@ -320,6 +370,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   process.chdir(path.resolve(path.dirname(new URL(import.meta.url).pathname), '..'));
   const skins = process.argv.slice(2).length ? process.argv.slice(2) : ['workbook', 'classic'];
   let fails = 0;
-  for (const s of skins) fails += report(await run({ skin: s }));
+  for (const s of skins) for (const fx of ['current', 'legacy']) fails += report(await run({ skin: s }, fx));
   process.exit(fails ? 1 : 0);
 }

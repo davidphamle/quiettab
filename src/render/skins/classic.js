@@ -30,6 +30,7 @@
 .c-tabs { display: flex; height: 100%; align-items: stretch; padding-left: 46px; border-top: 1px solid var(--line-strong); background: var(--chrome-bg); }
 .c-tab { padding: 0 16px; border-right: 1px solid var(--line-strong); color: var(--ink-2); font-size: 12px; }
 .c-tab.on { background: var(--sheet-bg); color: var(--ink); font-weight: 600; box-shadow: inset 0 2px 0 var(--accent); }
+.c-pager { margin-left: auto; display: flex; align-items: center; padding-right: 8px; }
 .c-status { display: flex; height: 100%; align-items: center; padding: 0 12px; font-size: 11.5px; color: var(--ink-3); border-top: 1px solid var(--line); }
 `;
 
@@ -73,13 +74,16 @@
   }
 
   function tabs(ctx) {
-    const el = h('div', { class: 'c-tabs' });
+    const list = h('span', { style: 'display:contents' });
+    const pg = QT.shell.pager(ctx);
+    const el = h('div', { class: 'c-tabs' }, list, h('span', { class: 'c-pager' }, pg.el));
     return {
       el,
-      set(list, active) {
-        el.replaceChildren(...list.map((t) => h('button', { class: 'c-tab' + (t.id === active ? ' on' : ''), 'data-tab': t.id, onclick: () => ctx.onTab(t.id) }, t.label)));
+      set(items, active) {
+        list.replaceChildren(...items.map((t) => h('button', { class: 'c-tab' + (t.id === active ? ' on' : ''), 'data-tab': t.id, onclick: () => ctx.onTab(t.id) }, t.label)));
       },
       setAggregate() {},
+      setPager: pg.set,
     };
   }
 

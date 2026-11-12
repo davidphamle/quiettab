@@ -15,7 +15,9 @@
 
   const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   function matches(row, detail) {
-    if (!row || !detail || !detail.title) return false;
+    if (!row || !detail) return false;
+    if (detail.id && row.id) return String(detail.id) === String(row.id);
+    if (!detail.title) return false;
     const a = norm(row.title);
     const b = norm(detail.title);
     return a === b || (a.length > 8 && (a.indexOf(b) === 0 || b.indexOf(a) === 0));

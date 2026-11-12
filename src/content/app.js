@@ -106,7 +106,8 @@
       st.expectForm = false;
       st.formStep = 1;
     } else {
-      if (!form.hasBack) st.formStep = 1;
+      if (form.step) st.formStep = form.step;
+      else if (!form.hasBack) st.formStep = 1;
       if (st.expectForm && !st.formHidden && st.sheet !== 'archive') {
         st.sheet = 'form';
         st.expectForm = false;
@@ -117,6 +118,7 @@
     const sheet = st.sheet;
     const m = sheet === 'form' ? null : model(sheet);
     const detail = sheet === 'items' && st.cardId ? QT.dom.readDetail() : null;
+    const pager = sheet === 'items' ? QT.dom.pager() : null;
 
     const sig = JSON.stringify([
       st,
@@ -126,6 +128,7 @@
       m && m.rows,
       m && m.all.length,
       detail,
+      pager,
       form && { f: form.fields.map((f) => [f.label, f.kind, f.value, f.required]), b: form.hasBack, p: form.primaryLabel },
     ]);
     if (!force && sig === lastSig) return;
@@ -150,18 +153,19 @@
         step: st.formStep,
         onSet: (f, v) => QT.dom.setField(f, v),
         onBack: () => {
-          st.formStep = Math.max(1, st.formStep - 1);
+          if (!form.step) st.formStep = Math.max(1, st.formStep - 1);
           QT.dom.applyBack();
           schedule();
         },
         onNext: () => {
-          if (!form.isFinal) st.formStep++;
+          if (!form.isFinal && !form.step) st.formStep++;
           QT.dom.applyNext();
           schedule();
         },
       });
       ui.status.set('Ready', form.fields.length + ' fields');
       ui.tabs.setAggregate('');
+      ui.tabs.setPager(null);
       return;
     }
 
@@ -191,6 +195,8 @@
       onNearEnd: sheet === 'items' ? more : null,
     };
     QT.grid.render(ui.main, gm);
+    if (sheet === 'items' && m.all.length === 0) ui.main.appendChild(emptyHint());
+    ui.tabs.setPager(pager);
 
     const chipKeys = sheet === 'items' ? ITEM_CHIPS : m.columns.slice(1, 6).map((c) => c.key);
     ui.chrome.setChips(
@@ -234,6 +240,18 @@
     const isEmptySource = sheet === 'items' && total === 0;
     ui.status.set(isEmptySource ? 'No data in this range' : 'Ready', shown === total ? `${total} rows` : `${shown} of ${total} rows`);
     ui.tabs.setAggregate(`Count: ${shown}`);
+  }
+
+  // Shown when Items has nothing to show: says how to get rows, in the
+  // tool's own vocabulary.
+  function emptyHint() {
+    const { h } = QT.ui;
+    return h(
+      'div',
+      { class: 'empty-hint' },
+      h('div', { class: 'eh-title' }, 'No rows on this sheet yet'),
+      h('div', null, 'Type a search term in Find and press Enter to fetch rows.')
+    );
   }
 
   function openFilter(sheet, col, anchor) {
@@ -306,6 +324,14 @@
     onFindEnter(v) {
       if (st.sheet === 'items' && v.trim()) QT.dom.widenSearch(v.trim());
     },
+    onPage(dir) {
+      if (QT.dom.goPage(dir)) {
+        st.cardId = null;
+        st.items.sel = { r: -1, c: st.items.sel.c };
+        ui.main.scrollTop = 0;
+        schedule();
+      }
+    },
     onChip(key, anchor) {
       const m = model(st.sheet);
       const col = m.columns.find((c) => c.key === key);
@@ -336,6 +362,9 @@
   }
 
   function onKey(e) {
+    // Inside a modal dialog, Escape would ask the source to close its form
+    // (and pop a "save this?" prompt). Never let it reach the dialog.
+    if (e.key === 'Escape' && host && host.parentNode && host.parentNode.tagName === 'DIALOG') e.preventDefault();
     if (isPanicKey(e)) {
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -373,6 +402,25 @@
     }
   }
 
+  // ---------- host placement ----------
+  // A modal dialog makes everything outside it inert and draws above it, so
+  // while one is open the host lives inside the topmost one (armour hides the
+  // dialog's own children). When it closes, or the site re-renders it away,
+  // the host goes back to <html>. Never removes or reorders the site's nodes.
+  function isModal(d) {
+    try {
+      return d.open && d.matches(':modal');
+    } catch (_) {
+      return d.open;
+    }
+  }
+  function placeHost() {
+    if (!host) return;
+    const modals = [...document.querySelectorAll('dialog[open]')].filter(isModal);
+    const target = modals.length ? modals[modals.length - 1] : document.documentElement;
+    if (host.parentNode !== target || target.lastElementChild !== host) target.appendChild(host);
+  }
+
   // ---------- lifecycle ----------
   function mount() {
     const s = QT.settings.values;
@@ -384,10 +432,9 @@
   }
 
   function applyPaused() {
-    const paused = !!QT.settings.values.paused;
-    document.documentElement.classList.toggle('qt-off', paused);
-    host.style.display = paused ? 'none' : 'block';
-    if (QT.titleGuard) paused ? QT.titleGuard.release() : QT.titleGuard.engage();
+    QT.cover.paused = !!QT.settings.values.paused;
+    QT.cover.host = host;
+    QT.cover.update();
   }
 
   A.start = function () {
@@ -401,12 +448,20 @@
     applyPaused();
     mount();
 
-    new MutationObserver(schedule).observe(QT.dom.observeRoot(), {
+    new MutationObserver(() => {
+      placeHost();
+      schedule();
+    }).observe(QT.dom.observeRoot(), {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: true,
-      attributeFilter: ['aria-pressed', 'aria-label', 'datetime'],
+      attributeFilter: ['aria-pressed', 'aria-label', 'aria-current', 'datetime', 'open', 'data-testid'],
+    });
+    new MutationObserver(placeHost).observe(document.documentElement, { childList: true });
+    QT.route.onChange(() => {
+      placeHost();
+      if (QT.cover.on) render(true);
     });
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('blur', () => {
@@ -424,12 +479,13 @@
         if (!msg) return;
         if (msg.type === 'qt:panic') panic();
         if (msg.type === 'qt:health')
-          reply({ misses: QT.health.total, rows: itemRows().length, paused: !!QT.settings.values.paused, skin: QT.settings.values.skin });
+          reply({ misses: QT.health.total, rows: itemRows().length, paused: !!QT.settings.values.paused, covered: QT.route.covered(), skin: QT.settings.values.skin });
       });
     }
   };
 
   A.panic = panic;
+  A.placeHost = placeHost;
   A.render = render;
   A.flush = () => {
     clearTimeout(timer);

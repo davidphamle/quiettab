@@ -60,6 +60,29 @@
     apply();
   }
 
+  // Cover state: covered = view switched on AND the page is one we cover.
+  // Settings load later (async), so until then only the route decides; a
+  // switched-off view shows the page a beat late rather than early.
+  const cover = (QT.cover = {
+    paused: false,
+    host: null,
+    get on() {
+      return !cover.paused && QT.route.covered();
+    },
+    update() {
+      const on = cover.on;
+      document.documentElement.classList.toggle('qt-off', !on);
+      if (cover.host) cover.host.style.display = on ? 'block' : 'none';
+      on ? guard.engage() : guard.release();
+      return on;
+    },
+  });
+  if (!cover.on) {
+    guard.active = false;
+    document.documentElement.classList.add('qt-off');
+  }
+  QT.route.onChange(() => cover.update());
+
   apply();
   if (document.head) watchHead();
   else

@@ -1,13 +1,17 @@
-// dom.js holds EVERY assumption about the source site's DOM and URLs.
-// No other file may contain one of its class names, attributes, URL shapes
-// or button labels. When the site changes, this file and
+// dom.js holds EVERY assumption about the source site's DOM (route.js holds
+// its URL shapes). No other file may contain one of its class names,
+// attributes or button labels. When the site changes, this file and
 // harness/mock-linkedin.html change together, and that diff is the record.
 //
-// Candidate selectors are ordered most-durable first:
-//   data attributes -> ARIA / accessible names -> structure -> class names.
-// Every lookup that falls through all candidates counts a miss in QT.health,
-// which the toolbar popup surfaces. That is the only way a user can tell
-// "the site changed its markup" apart from "there are no results".
+// Two markups are supported:
+//   current (Nov 2026, /jobs/search-results/): server-driven UI with hashed
+//     class names. Hooks are data-testid, componentkey and accessible names,
+//     never classes. Fixture: harness/mock-linkedin.html
+//   legacy (/jobs/search/): the older list with data-job-id attributes.
+//     Fixture: harness/mock-linkedin-legacy.html
+// Candidates are ordered most-durable first. Every lookup that falls through
+// all candidates counts a miss in QT.health, which the toolbar popup shows:
+// the only way to tell "the site changed its markup" from "no results".
 (function () {
   const QT = (window.QT = window.QT || {});
   const health = (QT.health = { misses: {}, total: 0 });
@@ -25,19 +29,18 @@
     if (key) miss(key);
     return null;
   }
-  function qa(root, list, key) {
+  function qa(root, list) {
     if (!root) return [];
     for (const s of list) {
       const els = root.querySelectorAll(s);
       if (els.length) return [...els];
     }
-    if (key) miss(key);
     return [];
   }
   const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
   const text = (el) => (el ? clean(el.textContent) : '');
-  // Text with a space at every node boundary: footers are lists of chips
-  // whose textContent would otherwise run together ("2 days agoSaved").
+  const label = (el) => (el ? clean(el.getAttribute('aria-label') || '') : '');
+  // Text with a space at every node boundary ("2 days ago" + "Saved").
   function spaced(el) {
     if (!el) return '';
     const parts = [];
@@ -45,54 +48,117 @@
     while (tw.nextNode()) parts.push(tw.currentNode.nodeValue);
     return clean(parts.join(' '));
   }
+  const AGO = /\b(\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|just now|today|yesterday)\b/i;
+  const CARD_KEY = 'job-card-component-ref-';
 
   const S = {
-    list: ['.jobs-search-results-list', '.scaffold-layout__list > div', '.scaffold-layout__list'],
-    card: ['li[data-occludable-job-id]', '[data-job-id]', '.job-card-container'],
-    cardLink: ['a[href*="/jobs/view/"]'],
-    cardTitle: ['.job-card-list__title--link strong', '.job-card-list__title', 'a[href*="/jobs/view/"]'],
-    cardCompany: ['.artdeco-entity-lockup__subtitle', '.job-card-container__primary-description', '.job-card-container__company-name'],
-    cardLocation: ['.job-card-container__metadata-wrapper li', '.artdeco-entity-lockup__caption', '.job-card-container__metadata-item'],
-    cardFooter: ['.job-card-container__footer-wrapper', '.job-card-list__footer-wrapper', 'ul[class*="footer"]'],
-    detail: ['[data-job-details-container]', '.jobs-search__job-details--container', '.jobs-details', '.job-view-layout'],
-    detailTitle: ['.job-details-jobs-unified-top-card__job-title', '.jobs-unified-top-card__job-title', 'h1'],
-    detailBody: ['#job-details', '.jobs-description__content', '.jobs-box__html-content'],
-    saveBtn: ['button.jobs-save-button', 'button[aria-label^="Save" i]', 'button[aria-label*="saved" i]'],
-    applyBtn: ['button.jobs-apply-button', 'button[aria-label*="Apply" i]'],
-    modal: ['[role="dialog"][aria-labelledby*="apply" i]', '.jobs-easy-apply-modal', '[role="dialog"].artdeco-modal'],
-    group: ['[data-test-form-element]', '.jobs-easy-apply-form-section__grouping', '.fb-dash-form-element'],
-    back: ['button[aria-label="Back to previous step"]'],
-    primary: [
-      'button[aria-label="Submit application"]',
-      'button[aria-label="Review your application"]',
-      'button[aria-label="Continue to next step"]',
-      'footer button.artdeco-button--primary',
+    // current
+    column: ['[data-testid="lazy-column"]'],
+    card: [`div[role="button"][componentkey^="${CARD_KEY}"]`, '[componentkey^="' + CARD_KEY + '"]'],
+    viewLink: ['a[href*="/jobs/view/"]'],
+    detailBody: ['[data-testid="expandable-text-box"]', '#job-details', '.jobs-description__content', '.jobs-box__html-content'],
+    saveBtn: [
+      'button[aria-label="Save the job"]',
+      'button[aria-label="Unsave the job"]',
+      'button[aria-label^="Saved" i]',
+      'button.jobs-save-button',
+      'button[aria-label^="Save" i]',
     ],
-    search: ['input[aria-label^="Search by title" i]', 'input[id^="jobs-search-box-keyword"]', '.jobs-search-box__text-input'],
+    applyBtn: [
+      'button[aria-label="Easy Apply to this job"]',
+      'button[aria-label^="Apply on company website" i]',
+      'button.jobs-apply-button',
+      'button[aria-label*="Apply" i]',
+    ],
+    modal: ['dialog[data-testid="dialog"][open]', 'dialog[open]', '.jobs-easy-apply-modal', '[role="dialog"][aria-labelledby*="apply" i]', '[role="dialog"].artdeco-modal'],
+    search: ['input[data-testid="typeahead-input"]', 'input[aria-label^="Search by title" i]', 'input[id^="jobs-search-box-keyword"]'],
+    pageNext: ['[data-testid="pagination-controls-next-button-visible"]'],
+    pagePrev: ['[data-testid="pagination-controls-prev-button-visible"]'],
+    pageCurrent: ['[data-testid^="pagination-indicator"][aria-current="true"]', '[data-testid^="pagination-indicator"][aria-current="page"]'],
+    // legacy
+    lList: ['.jobs-search-results-list', '.scaffold-layout__list > div', '.scaffold-layout__list'],
+    lCard: ['li[data-occludable-job-id]', '[data-job-id]'],
+    lTitle: ['.job-card-list__title--link strong', '.job-card-list__title', 'a[href*="/jobs/view/"]'],
+    lCompany: ['.artdeco-entity-lockup__subtitle', '.job-card-container__primary-description', '.job-card-container__company-name'],
+    lLocation: ['.job-card-container__metadata-wrapper li', '.artdeco-entity-lockup__caption', '.job-card-container__metadata-item'],
+    lFooter: ['.job-card-container__footer-wrapper', '.job-card-list__footer-wrapper', 'ul[class*="footer"]'],
+    lDetail: ['[data-job-details-container]', '.jobs-search__job-details--container', '.jobs-details', '.job-view-layout'],
+    lDetailTitle: ['.job-details-jobs-unified-top-card__job-title', '.jobs-unified-top-card__job-title', 'h1'],
   };
 
-  function jobId(card) {
+  const viewId = (a) => {
+    const m = a && (a.getAttribute('href') || '').match(/\/jobs\/view\/(\d+)/);
+    return m ? m[1] : null;
+  };
+  const inDialog = (el) => !!(el.closest && el.closest('dialog, [role="dialog"]'));
+
+  // ---------- current markup ----------
+  function currentCards() {
+    return qa(document, S.card).filter((c) => !inDialog(c));
+  }
+  function listColumn() {
+    const c = currentCards()[0];
+    return c ? c.closest(S.column[0]) : null;
+  }
+  // The detail pane is the outermost lazy column that is not the list and
+  // not inside a dialog. (It nests another lazy column.)
+  function detailRoot() {
+    const list = listColumn();
+    for (const col of document.querySelectorAll(S.column[0])) {
+      if (col === list || inDialog(col)) continue;
+      if (list && (list.contains(col) || col.contains(list))) continue;
+      if (q(col, S.detailBody) || q(col, S.saveBtn) || q(col, S.viewLink)) return col;
+    }
+    return null;
+  }
+  function readCurrentCard(card) {
+    const id = (card.getAttribute('componentkey') || '').slice(CARD_KEY.length).match(/^\d+/);
+    const ps = [...card.querySelectorAll('p')];
+    if (!id || !ps.length) return null;
+    const t = ps[0].querySelector('[aria-hidden="true"]');
+    const title = clean(t ? t.textContent : text(ps[0]).replace(/\s*\(Verified job\)\s*$/i, ''));
+    if (!title) return null;
+    const rest = ps.slice(3).map(spaced).join(' · ');
+    const ago = rest.match(AGO);
+    return {
+      id: id[0],
+      title,
+      company: text(ps[1]),
+      location: text(ps[2]),
+      posted: ago ? ago[1] : '',
+      easy: /\bEasy Apply\b/i.test(rest),
+      state: /\bApplied\b/i.test(rest) ? 'Applied' : /\bSaved\b/i.test(rest) ? 'Saved' : /\bViewed\b/i.test(rest) ? 'Viewed' : '',
+    };
+  }
+
+  // ---------- legacy markup ----------
+  function legacyId(card) {
     const d = card.dataset || {};
     if (d.occludableJobId) return d.occludableJobId;
     if (d.jobId) return d.jobId;
     const inner = card.querySelector('[data-job-id]');
     if (inner) return inner.dataset.jobId;
-    const a = card.querySelector('a[href*="/jobs/view/"]');
-    const m = a && a.getAttribute('href').match(/\/jobs\/view\/(\d+)/);
-    return m ? m[1] : null;
+    return viewId(card.querySelector('a[href*="/jobs/view/"]'));
   }
-
-  function cardState(card) {
-    const foot = spaced(q(card, S.cardFooter));
-    if (/\bApplied\b/i.test(foot)) return 'Applied';
-    if (/\bSaved\b/i.test(foot)) return 'Saved';
-    if (/\bViewed\b/i.test(foot)) return 'Viewed';
-    return '';
+  function readLegacyCard(card) {
+    const id = legacyId(card);
+    const title = text(q(card, S.lTitle));
+    if (!id || !title) return null; // occluded placeholder, not loaded yet
+    const time = card.querySelector('time');
+    const foot = spaced(q(card, S.lFooter));
+    return {
+      id,
+      title,
+      company: text(q(card, S.lCompany, 'cardCompany')),
+      location: text(q(card, S.lLocation, 'cardLocation')),
+      posted: time ? text(time) : '',
+      easy: /Easy Apply/i.test(foot),
+      state: /\bApplied\b/i.test(foot) ? 'Applied' : /\bSaved\b/i.test(foot) ? 'Saved' : /\bViewed\b/i.test(foot) ? 'Viewed' : '',
+    };
   }
 
   // Block-aware text: keeps paragraph and list structure without innerText,
-  // which depends on layout (and the page is at opacity 0, not unlaid-out,
-  // but innerText is also absent in test DOMs).
+  // which depends on layout and is absent in test DOMs.
   function blocks(root) {
     const out = [];
     let line = '';
@@ -107,7 +173,11 @@
         else if (c.nodeType === 1) {
           const tag = c.tagName;
           if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'BUTTON') continue;
-          if (tag === 'BR') { flush(); continue; }
+          if (c.getAttribute('aria-hidden') === 'true') continue;
+          if (tag === 'BR') {
+            flush();
+            continue;
+          }
           const block = /^(P|DIV|LI|UL|OL|H[1-6]|SECTION|ARTICLE)$/.test(tag);
           if (block) flush();
           if (tag === 'LI') line += '• ';
@@ -120,128 +190,168 @@
     return out;
   }
 
+  function detailPane() {
+    return detailRoot() || q(document, S.lDetail);
+  }
+  function findCard(id) {
+    return (
+      document.querySelector(`[componentkey="${CARD_KEY}${id}"]`) ||
+      document.querySelector(`[data-occludable-job-id="${id}"]`) ||
+      document.querySelector(`[data-job-id="${id}"]`)
+    );
+  }
+
+  // ---------- apply dialog ----------
+  function applyModal() {
+    const open = [];
+    for (const s of S.modal) for (const el of document.querySelectorAll(s)) if (!open.includes(el)) open.push(el);
+    // The one holding form controls; skips "Save this application?" and
+    // other confirm dialogs layered on top.
+    return open.find((m) => m.isConnected && m.querySelector('input:not([type="hidden"]), select, textarea')) || null;
+  }
+  const BTN = (m, words) =>
+    [...m.querySelectorAll('button')].find((b) => {
+      const s = (label(b) + ' ' + text(b)).toLowerCase();
+      return words.some((w) => s.indexOf(w) !== -1);
+    }) || null;
+  function primaryBtn(m) {
+    return BTN(m, ['submit application']) || BTN(m, ['review']) || BTN(m, ['continue to next step', 'next']) || null;
+  }
+  function backBtn(m) {
+    return [...m.querySelectorAll('button')].find((b) => /^back\b/i.test(label(b) || text(b))) || null;
+  }
+  function labelFor(m, el) {
+    if (el.id) {
+      const l = m.querySelector(`label[for="${el.id.replace(/"/g, '\\"')}"]`);
+      if (l) return text(l);
+    }
+    const wrap = el.closest('label');
+    if (wrap) return text(wrap);
+    const by = el.getAttribute('aria-labelledby');
+    if (by) {
+      const l = document.getElementById(by.split(' ')[0]);
+      if (l) return text(l);
+    }
+    return label(el);
+  }
+
   const dom = (QT.dom = {
     S,
-    isJobsRoute() {
-      return location.pathname.indexOf('/jobs') === 0 || !!q(document, S.card);
+    navigate(url) {
+      location.assign(url);
     },
 
     readRows() {
+      if (!QT.route.covered()) return [];
+      const out = [];
       const seen = new Set();
-      const rows = [];
-      const cards = dom.isJobsRoute() ? qa(document, S.card, 'card') : [];
-      let untitled = 0;
-      for (const card of cards) {
-        const id = jobId(card);
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        const title = text(q(card, S.cardTitle));
-        if (!title) {
-          untitled++; // occluded placeholder: the list keeps off-screen cards empty
-          continue;
-        }
-        const time = card.querySelector('time');
-        const foot = spaced(q(card, S.cardFooter));
-        rows.push({
-          id,
-          title,
-          company: text(q(card, S.cardCompany, 'cardCompany')),
-          location: text(q(card, S.cardLocation, 'cardLocation')),
-          posted: time ? text(time) : '',
-          postedISO: time ? time.getAttribute('datetime') || '' : '',
-          easy: /Easy Apply/i.test(foot),
-          state: cardState(card),
-        });
+      const cur = currentCards();
+      const cards = cur.length ? cur : qa(document, S.lCard);
+      const read = cur.length ? readCurrentCard : readLegacyCard;
+      for (const c of cards) {
+        const r = read(c);
+        if (!r || seen.has(r.id)) continue;
+        seen.add(r.id);
+        out.push(r);
       }
       // Cards present but none readable means the title markup moved.
-      if (cards.length && !rows.length && untitled) miss('cardTitle');
-      return rows;
+      if (cards.length && !out.length) miss('cardTitle');
+      return out;
     },
 
     clickRow(id) {
-      const card =
-        document.querySelector(`[data-occludable-job-id="${id}"]`) ||
-        document.querySelector(`[data-job-id="${id}"]`);
+      const card = findCard(id);
       if (!card) return miss('clickRow'), false;
-      const target = q(card, S.cardLink) || card;
+      const target = card.matches('[role="button"]') ? card : card.querySelector('a[href*="/jobs/view/"]') || card;
       target.click();
       return true;
     },
 
     readDetail() {
-      const pane = q(document, S.detail);
+      const pane = detailPane();
       if (!pane) return null;
-      const title = text(q(pane, S.detailTitle));
+      const link = q(pane, S.viewLink);
+      const title = text(link) || text(q(pane, S.lDetailTitle));
       const body = q(pane, S.detailBody);
       const save = q(pane, S.saveBtn);
       const apply = q(pane, S.applyBtn);
       return {
+        id: viewId(link),
         title,
         notes: body ? blocks(body) : [],
-        saved: save ? save.getAttribute('aria-pressed') === 'true' || /^Saved\b/i.test(text(save)) : false,
+        saved: !!save && (save.getAttribute('aria-pressed') === 'true' || /^(unsave|saved)\b/i.test(label(save)) || /^saved$/i.test(text(save))),
         canSave: !!save,
-        easy: apply ? /Easy Apply/i.test(text(apply) + ' ' + (apply.getAttribute('aria-label') || '')) : false,
+        easy: !!apply && /easy apply/i.test(label(apply) + ' ' + text(apply)),
         canApply: !!apply,
       };
     },
 
     toggleSave() {
-      const pane = q(document, S.detail);
-      const btn = q(pane, S.saveBtn, 'saveBtn');
+      const btn = q(detailPane(), S.saveBtn, 'saveBtn');
       if (btn) btn.click();
       return !!btn;
     },
 
     openApply() {
-      const pane = q(document, S.detail);
-      const btn = q(pane, S.applyBtn, 'applyBtn');
+      const btn = q(detailPane(), S.applyBtn, 'applyBtn');
       if (btn) btn.click();
       return !!btn;
     },
 
-    // The apply dialog, read semantically. Step is derived from the
-    // accessibility contract, not from the progress meter: the meter is
-    // already non-zero on the first screen because contact details arrive
-    // prefilled.
+    // The apply dialog, read semantically. The current dialog states its
+    // page ("2/4 pages"); otherwise step comes from the accessibility
+    // contract (Back present, "Submit application"), never the progress
+    // meter, which is non-zero on the first screen.
     readApply() {
-      const modal = q(document, S.modal);
-      if (!modal || !modal.isConnected) return null;
-      const back = q(modal, S.back);
-      const primary = q(modal, S.primary);
-      const primaryLabel = primary ? primary.getAttribute('aria-label') || text(primary) : '';
-      const fields = qa(modal, S.group).map((g, i) => {
-        const radios = [...g.querySelectorAll('input[type="radio"]')];
-        const control = radios.length ? null : g.querySelector('input:not([type="hidden"]), select, textarea');
-        const labelEl = g.querySelector('legend, label');
-        const label = clean(labelEl ? labelEl.textContent : '');
-        const required =
-          !!g.querySelector('[required], [aria-required="true"]') || /\*\s*$/.test(label);
-        if (radios.length) {
-          const opts = radios.map((r) => {
-            const l = g.querySelector(`label[for="${r.id}"]`);
-            return { value: r.value, label: clean(l ? l.textContent : r.value), el: r };
-          });
-          const on = radios.find((r) => r.checked);
-          return { i, kind: 'radio', label: label.replace(/\*\s*$/, ''), required, options: opts, value: on ? on.value : '' };
+      const modal = applyModal();
+      if (!modal) return null;
+      const primary = primaryBtn(modal);
+      const primaryLabel = primary ? label(primary) || text(primary) : '';
+      const pages = text(modal).match(/(\d+)\s*\/\s*(\d+)\s*pages?/i);
+
+      const fields = [];
+      const radios = new Map();
+      for (const el of modal.querySelectorAll('input:not([type="hidden"]), select, textarea')) {
+        const req = el.required || el.getAttribute('aria-required') === 'true';
+        if (el.type === 'radio') {
+          const key = el.name || el.closest('fieldset') || el;
+          if (!radios.has(key)) {
+            const fs = el.closest('fieldset');
+            const lg = fs && fs.querySelector('legend');
+            const f = { kind: 'radio', label: text(lg), required: req, options: [], value: '' };
+            radios.set(key, f);
+            fields.push(f);
+          }
+          const f = radios.get(key);
+          f.options.push({ value: el.value, label: labelFor(modal, el) || el.value, el });
+          if (el.checked) f.value = el.value;
+          if (req) f.required = true;
+          continue;
         }
-        if (!control) return { i, kind: 'static', label, required: false, value: '' };
-        const kind = control.tagName === 'SELECT' ? 'select' : control.type === 'checkbox' ? 'checkbox' : control.type === 'file' ? 'file' : 'text';
-        return {
-          i,
+        const kind = el.tagName === 'SELECT' ? 'select' : el.type === 'checkbox' ? 'checkbox' : el.type === 'file' ? 'file' : 'text';
+        fields.push({
           kind,
-          label: label.replace(/\*\s*$/, ''),
-          required,
-          el: control,
-          options: kind === 'select' ? [...control.options].map((o) => ({ value: o.value, label: clean(o.textContent) })) : null,
-          value: kind === 'checkbox' ? (control.checked ? 'Yes' : '') : kind === 'file' ? (control.files && control.files[0] ? control.files[0].name : '') : control.value,
-        };
+          label: labelFor(modal, el),
+          required: req,
+          el,
+          options: kind === 'select' ? [...el.options].map((o) => ({ value: o.value, label: clean(o.textContent) })) : null,
+          value: kind === 'checkbox' ? (el.checked ? 'Yes' : '') : kind === 'file' ? (el.files && el.files[0] ? el.files[0].name : '') : el.value,
+        });
+      }
+      fields.forEach((f, i) => {
+        f.i = i;
+        if (/\*\s*$/.test(f.label)) f.required = true;
+        f.label = f.label.replace(/\s*\*\s*$/, '');
       });
+
       return {
         modal,
-        hasBack: !!back,
+        hasBack: !!backBtn(modal),
         isFinal: /submit application/i.test(primaryLabel),
         isReview: /review/i.test(primaryLabel),
         primaryLabel,
+        step: pages ? +pages[1] : null,
+        steps: pages ? +pages[2] : null,
         fields,
       };
     },
@@ -266,39 +376,55 @@
     },
 
     applyBack() {
-      const modal = q(document, S.modal);
-      const b = q(modal, S.back, 'back');
+      const m = applyModal();
+      const b = m && backBtn(m);
       if (b) b.click();
+      else miss('back');
     },
     applyNext() {
-      const modal = q(document, S.modal);
-      const b = q(modal, S.primary, 'primary');
+      const m = applyModal();
+      const b = m && primaryBtn(m);
       if (b) b.click();
+      else miss('primary');
     },
 
-    // Narrow locally is the grid's job; widening hands the string to the
-    // site's own search.
+    // Narrowing is the grid's job; widening hands the string to the site's
+    // own search. The current site's search box is a typeahead that ignores
+    // synthetic keys, so it navigates to the results URL instead.
     widenSearch(query) {
-      const input = q(document, S.search);
-      if (input) {
+      const legacy = !document.querySelector(S.search[0]) && q(document, S.search);
+      if (legacy) {
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-        setter.call(input, query);
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+        setter.call(legacy, query);
+        legacy.dispatchEvent(new Event('input', { bubbles: true }));
+        legacy.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
         return 'input';
       }
-      location.assign('/jobs/search/?keywords=' + encodeURIComponent(query));
+      dom.navigate(QT.route.searchUrl(query));
       return 'url';
     },
 
-    // Results lazy-load as their list scrolls. Scrolling it (it is laid out,
-    // just transparent) triggers their IntersectionObserver.
+    // Current markup pages its results; legacy lazy-loads on scroll.
+    pager() {
+      const cur = q(document, S.pageCurrent);
+      const next = q(document, S.pageNext);
+      const prev = q(document, S.pagePrev);
+      if (!cur && !next && !prev) return null;
+      const n = cur && (label(cur) || text(cur)).match(/\d+/);
+      return { page: n ? +n[0] : 1, hasPrev: !!prev, hasNext: !!next };
+    },
+    goPage(dir) {
+      const b = q(document, dir > 0 ? S.pageNext : S.pagePrev);
+      if (b) b.click();
+      return !!b;
+    },
     loadMore() {
-      let box = q(document, S.list);
+      if (dom.pager()) return; // paged, not infinite
+      let box = q(document, S.lList);
       const start = box;
       while (box && box !== document.body && box.scrollHeight <= box.clientHeight) box = box.parentElement;
       if (!box || box === document.body) box = start;
-      if (!box) return window.scrollTo(0, document.documentElement.scrollHeight);
+      if (!box) return;
       box.scrollTop = box.scrollHeight;
       box.dispatchEvent(new Event('scroll'));
     },
