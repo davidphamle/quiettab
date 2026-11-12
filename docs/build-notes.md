@@ -158,3 +158,19 @@ button contrast in all states, prompt on top, menu inside the window.
 prompt showed only Cancel. Prompt actions now include links; a prompt with
 no forward action counts a `promptAction` miss so the toolbar panel shows it.
 Fixture updated to use a link.
+
+**v0.5.3:** "Open form" showed a "Confirm / Cancel Cancel" box that vanished,
+and the Form sheet never opened. Traced live: the site opens its apply
+dialog after a round trip (~1 s), *empty* at first (only Dismiss), then
+fills it. Three fixes, each with a check that fails on v0.5.2:
+- a dialog with no forward action is not a prompt (it is loading); prompt
+  actions are de-duplicated by label;
+- the switch to the Form sheet now waits up to 15 s for the form instead of
+  giving up on the first render that finds nothing, and no prompt is drawn
+  while it waits;
+- the Form sheet skipped redrawing whenever focus was inside it, which after
+  clicking its own Next meant forever (stuck on page 1). It now skips only
+  while typing in a field, and redraws regardless when the page changes.
+Also read live: page 2 is an unlabelled résumé radio group whose options
+are file names; it now reads as "Resume". Back/Next/"N/4 pages" wording
+confirmed live. Fixture models the late, empty dialog (`applyDelay`).

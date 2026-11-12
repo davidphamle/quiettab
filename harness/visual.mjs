@@ -74,11 +74,16 @@ await p.evaluate(() => {
 });
 await shot('3-filter');
 
+// Live timing: the form opens late and empty, then fills.
 await p.evaluate(() => {
+  window.__mock.applyDelay = 300;
   QT.app.ui().closePop();
   QT.app.root.querySelectorAll('.card-foot .btn')[1].click();
 });
-await sleep(400);
+await sleep(450);
+const midLoad = await p.evaluate(() => ({ dialogOpen: !!document.querySelector('dialog[open]'), promptShown: !!QT.app.root.querySelector('.pr') }));
+await sleep(500);
+const formArrived = await p.evaluate(() => !!QT.app.root.querySelector('.f-wrap'));
 await shot('4-form');
 const b2 = await bands();
 // Real top layer: the source's form is a showModal() dialog.
@@ -207,5 +212,5 @@ await pop.screenshot({ path: `${OUT}/popup-${skin}-off.png` });
 await browser.close();
 const same = [b1, b2, b3].every((b) => JSON.stringify(b) === JSON.stringify(b0));
 const tl = Object.values(topLayer).every(Boolean);
-console.log(JSON.stringify({ skin, armourOnlyBodyOpacity: blank, bandsStable: same, topLayer, typedThrough, escapeKeptOpen, buttonStates, prompt, menuInView, title, errors }, null, 2));
-process.exit(blank === '0' && same && tl && typedThrough === '0499 111 222' && escapeKeptOpen && buttonsOk && prompt && prompt.onTop && menuInView && !errors.length ? 0 : 1);
+console.log(JSON.stringify({ skin, midLoad, formArrived, armourOnlyBodyOpacity: blank, bandsStable: same, topLayer, typedThrough, escapeKeptOpen, buttonStates, prompt, menuInView, title, errors }, null, 2));
+process.exit(midLoad.dialogOpen && !midLoad.promptShown && formArrived && blank === '0' && same && tl && typedThrough === '0499 111 222' && escapeKeptOpen && buttonsOk && prompt && prompt.onTop && menuInView && !errors.length ? 0 : 1);

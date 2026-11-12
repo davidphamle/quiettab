@@ -358,6 +358,9 @@
         });
       }
       fields.forEach((f, i) => {
+        // The live résumé picker is one unlabelled radio group whose options
+        // are file names.
+        if (f.kind === 'radio' && !f.label) f.label = f.options.every((o) => /\.(pdf|docx?|rtf|txt)$/i.test(o.label)) ? 'Resume' : 'Choose one';
         f.i = i;
         if (/\*\s*$/.test(f.label)) f.required = true;
         f.label = f.label.replace(/\s*\*\s*$/, '');
@@ -394,11 +397,15 @@
       // through the site's redirect, not a button.
       for (const b of m.querySelectorAll('button, a[href], [role="button"]')) {
         const t = text(b);
-        if (!t && /^(dismiss|close)\b/i.test(label(b))) actions.unshift({ el: b, label: 'Cancel', cancel: true });
-        else if (ACTION.test(t)) actions.push({ el: b, label: t, cancel: /^(cancel|not now|close)$/i.test(t) });
+        const isX = !t && /^(dismiss|close)\b/i.test(label(b));
+        const a = isX ? { el: b, label: 'Cancel', cancel: true } : ACTION.test(t) ? { el: b, label: t, cancel: /^(cancel|not now|close)$/i.test(t) } : null;
+        if (!a || actions.some((x) => x.label.toLowerCase() === a.label.toLowerCase())) continue;
+        isX ? actions.unshift(a) : actions.push(a);
       }
+      // No way forward = not a question yet (the apply form is still loading
+      // its fields, or a spinner). Show nothing rather than a dead "Confirm".
+      if (!actions.some((a) => !a.cancel)) return (promptEls = { toggles: [], actions: [] }), null;
       if (!actions.some((a) => a.cancel)) miss('promptCancel');
-      if (!actions.some((a) => !a.cancel)) miss('promptAction');
       promptEls = { toggles, actions };
       return {
         title,

@@ -32,6 +32,7 @@
   let root = null;
   let ui = null;
   let lastSig = '';
+  let lastShape = '';
   let timer = null;
   let lastMore = 0;
   // Some source cards drop their date (once viewed); the detail pane still
@@ -95,7 +96,7 @@
   // ---------- render ----------
   function formFocused() {
     const a = root && root.activeElement;
-    return !!(a && a.closest && a.closest('.f-wrap'));
+    return !!(a && a.closest && a.closest('.f-wrap') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName));
   }
 
   function render(force) {
@@ -104,9 +105,12 @@
     const skin = ui.skin;
     const form = QT.dom.readApply();
 
+    // The source opens its form after a network round trip (over a second,
+    // live). Keep waiting for it for a while instead of giving up on the
+    // first render that finds nothing.
+    if (st.expectForm && Date.now() - st.expectForm > 15000) st.expectForm = false;
     if (!form) {
       if (st.sheet === 'form') st.sheet = 'items';
-      st.expectForm = false;
       st.formStep = 1;
     } else {
       if (form.step) st.formStep = form.step;
@@ -122,7 +126,8 @@
     const m = sheet === 'form' ? null : model(sheet);
     const detail = sheet === 'items' && st.cardId ? QT.dom.readDetail() : null;
     if (detail && detail.id && detail.posted) postedById[detail.id] = detail.posted;
-    const prompt = QT.cover.on && !st.formHidden ? QT.dom.readPrompt() : null;
+    // While a form is on its way, its half-loaded dialog is not a prompt.
+    const prompt = QT.cover.on && !st.formHidden && !(st.expectForm && !form) ? QT.dom.readPrompt() : null;
     const pager = sheet === 'items' ? QT.dom.pager() : null;
 
     const sig = JSON.stringify([
@@ -138,8 +143,12 @@
       form && { f: form.fields.map((f) => [f.label, f.kind, f.value, f.required]), b: form.hasBack, p: form.primaryLabel },
     ]);
     if (!force && sig === lastSig) return;
-    if (sheet === 'form' && formFocused() && !force) return; // don't rebuild under the caret
+    // Don't rebuild under the caret while typing, unless the form itself
+    // changed (a new page, new fields): then the old cells are wrong.
+    const shape = form ? JSON.stringify([form.step, form.primaryLabel, form.hasBack, form.fields.map((f) => [f.label, f.kind])]) : '';
+    if (sheet === 'form' && formFocused() && !force && shape === lastShape) return;
     lastSig = sig;
+    lastShape = shape;
 
     const tabs = [
       { id: 'items', label: 'Items' },
@@ -231,7 +240,7 @@
           schedule();
         },
         onOpen: () => {
-          if (detail && detail.easy) st.expectForm = true;
+          if (detail && detail.easy) st.expectForm = Date.now();
           QT.dom.openApply();
           schedule();
         },

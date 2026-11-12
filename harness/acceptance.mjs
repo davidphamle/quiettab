@@ -237,10 +237,16 @@ export async function run(seedBase = {}, fixture = 'current') {
   phone.value = '0412 345 678';
   phone.dispatchEvent(new w.Event('input', { bubbles: true }));
   check('typing writes into the source field', w.__mock.answers.phone === '0412 345 678' && w.__mock.field('phone').value === '0412 345 678');
-  $$(w, '.f-bar .btn')[1].click();
+  const nextBtn = $$(w, '.f-bar .btn')[1];
+  nextBtn.focus(); // as after a real click: focus stays on the sheet's Next
+  nextBtn.click();
   await wait(w, 5);
   flush(w);
-  check('Next advances to step 2', $('.f-step').textContent.startsWith('Step 2') && !$$(w, '.f-bar .btn')[0].disabled);
+  check('Next advances to step 2 (redraws even with focus on the sheet\'s Next)', $('.f-step').textContent.startsWith('Step 2') && !$$(w, '.f-bar .btn')[0].disabled);
+  if (CUR) {
+    const lbls = $$(w, '.f-wrap tbody tr:not(.empty) td:nth-child(2)').map((e) => e.textContent);
+    check('unlabelled résumé picker reads as "Resume" with file names', lbls.includes('Resume') && $$(w, '.f-wrap select.f-in option').some((o) => /CV\.pdf$/.test(o.textContent)), lbls);
+  }
   const yrs = $$(w, '.f-wrap .f-in')[0];
   yrs.value = '7';
   yrs.dispatchEvent(new w.Event('input', { bubbles: true }));
@@ -339,6 +345,29 @@ export async function run(seedBase = {}, fixture = 'current') {
     check('right-click on a tab opens its menu', !!$('.mmenu') && $$(w, '.mmenu .mm-item').some((b) => b.textContent === 'Clear filters'));
     w.QT.app.ui().closePop();
     check('Count readout is text, not a dead button', $('.w-agg').tagName === 'SPAN');
+  }
+
+  if (CUR) {
+    group('Slow form (live timing)');
+    w = await bootW(S({}));
+    w.__mock.applyDelay = 60; // dialog opens late, then empty, then fields
+    await openRow(w, 0);
+    $$(w, '.card-foot .btn')[1].click();
+    await wait(w, 90);
+    flush(w);
+    check('the half-loaded dialog is not drawn as a "Confirm" prompt', !!w.__mock.modal() && !$('.pr'));
+    check('still on Items while the form loads', activeTab(w) === 'items');
+    await wait(w, 120);
+    flush(w);
+    check('switches to the Form sheet when the fields arrive', activeTab(w) === 'form' && $('.f-step').textContent === 'Step 1 of 3');
+    const dd = w.document.createElement('dialog');
+    dd.innerHTML = '<header id="dialog-header"><h2>Leave this page?</h2><button aria-label="Dismiss"></button></header><button>Cancel</button><button>Continue</button>';
+    w.document.body.appendChild(dd);
+    dd.showModal();
+    const pa = w.QT.dom.readPrompt();
+    check('prompt actions never repeat (no "Cancel Cancel")', pa && pa.actions.map((x) => x.label).join() === 'Cancel,Continue', pa && pa.actions);
+    dd.close();
+    dd.remove();
   }
 
   group('Loading & settings');

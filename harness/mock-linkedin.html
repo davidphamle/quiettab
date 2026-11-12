@@ -216,8 +216,16 @@
     modal.dataset.job = j[0];
     backPath = location.pathname + location.search;
     try { history.pushState({}, '', '/jobs/view/' + j[0] + '/'); } catch (_) {}
-    show(modal);
-    paintModal();
+    // Live: the dialog opens empty (only Dismiss) and its fields arrive
+    // after a round trip. M.applyDelay > 0 models that.
+    const m = modal;
+    const go = () => {
+      show(m);
+      if (!M.applyDelay) return paintModal();
+      m.innerHTML = '<header id="dialog-header"><h2>Apply</h2><button type="button" aria-label="Dismiss"></button></header><div data-testid="dialog-content"><div class="spinner"></div></div>';
+      setTimeout(() => modal === m && paintModal(), M.applyDelay);
+    };
+    M.applyDelay ? setTimeout(go, M.applyDelay) : go();
   }
   function paintModal() {
     let body = '';
@@ -238,7 +246,10 @@
         <fieldset><legend>Do you have the right to work in Australia?*</legend>
           <input type="radio" id="_r_a_" name="_r_rights_" value="Yes" ${answers.rights === 'Yes' ? 'checked' : ''}><label for="_r_a_">Yes</label>
           <input type="radio" id="_r_b_" name="_r_rights_" value="No" ${answers.rights === 'No' ? 'checked' : ''}><label for="_r_b_">No</label></fieldset>
-        <div><label for="_r_cv_">Resume</label><input id="_r_cv_" type="file"></div>`;
+        <div>
+          <input type="radio" name="radio-group-_r_1e_" value="cv1" aria-label="Alex Doe - CV (Product).pdf" ${answers.cv !== 'cv2' ? 'checked' : ''}>
+          <input type="radio" name="radio-group-_r_1e_" value="cv2" aria-label="Alex Doe - CV.pdf" ${answers.cv === 'cv2' ? 'checked' : ''}>
+          <button type="button">Upload resume</button></div>`;
     if (step === 3)
       body = `
         <h3>Review your application</h3>
@@ -265,6 +276,7 @@
     if (t.id === '_r_n_') answers.phone = t.value;
     if (t.id === '_r_q_') answers.years = t.value;
     if (t.name === '_r_rights_') answers.rights = t.value;
+    if (t.name === 'radio-group-_r_1e_') answers.cv = t.value;
     if (t.id === '_r_f_') answers.follow = t.checked;
   }
   function closeModal() {
