@@ -152,3 +152,9 @@ From the second live session:
 
 Checks: 130 / 113 (workbook current / legacy), 122 / 105 (classic). Visual:
 button contrast in all states, prompt on top, menu inside the window.
+
+**v0.5.2:** the live *Continue* in "Share your profile?" is a link
+(`<a target="_blank">` through the site's redirect), not a button, so the
+prompt showed only Cancel. Prompt actions now include links; a prompt with
+no forward action counts a `promptAction` miss so the toolbar panel shows it.
+Fixture updated to use a link.

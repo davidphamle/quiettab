@@ -390,12 +390,15 @@
         return { el, on: el.checked, label: share ? 'Share my profile when I continue' : l && !/^tap to toggle/i.test(l) && !/linkedin|\bjobs?\b/i.test(l) ? l : 'Option' };
       });
       const actions = [];
-      for (const b of m.querySelectorAll('button')) {
+      // Actions can be links: the live "Continue" is an <a target=_blank>
+      // through the site's redirect, not a button.
+      for (const b of m.querySelectorAll('button, a[href], [role="button"]')) {
         const t = text(b);
         if (!t && /^(dismiss|close)\b/i.test(label(b))) actions.unshift({ el: b, label: 'Cancel', cancel: true });
         else if (ACTION.test(t)) actions.push({ el: b, label: t, cancel: /^(cancel|not now|close)$/i.test(t) });
       }
       if (!actions.some((a) => a.cancel)) miss('promptCancel');
+      if (!actions.some((a) => !a.cancel)) miss('promptAction');
       promptEls = { toggles, actions };
       return {
         title,

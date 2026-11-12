@@ -279,6 +279,7 @@ export async function run(seedBase = {}, fixture = 'current') {
   if (CUR) {
     check('the source\'s "Share your profile?" step is redrawn as a prompt', !!$('.pr') && $('.pr-title').textContent === 'Share your profile?');
     check('a settings switch does not make a Form tab', !tabIds(w).includes('form') && activeTab(w) === 'items');
+    check('a link-type action (the live Continue is an <a>) is offered', w.QT.health.misses.promptAction === undefined);
     check('prompt shows the switch state and Continue / Cancel', $('.pr-toggle input').checked && $$(w, '.pr-foot .btn').map((b) => b.textContent).join() === 'Cancel,Continue');
     check('prompt uses no source vocabulary', !/linkedin|\bjobs?\b|apply|poster/i.test($('.pr').textContent));
     const pre = snap(w);

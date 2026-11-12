@@ -305,15 +305,16 @@
     share.innerHTML = `
       <header id="dialog-header"><h2>Share your profile?</h2><button type="button" aria-label="Dismiss"></button></header>
       <div data-testid="dialog-content">
-        <button type="button">David Pham Le</button>
+        <a href="https://www.linkedin.com/in/davidphamle/">David Pham Le</a>
         <p>Increase your chance of being viewed</p>
         <p>Share your full profile with the job poster when you click apply.</p>
         <label><input type="checkbox" role="switch" id="_r_2a_" aria-label="Tap to toggle setting" checked> On</label>
       </div>
-      <footer><button type="button">Continue</button></footer>`;
+      <footer><a href="https://www.linkedin.com/safety/go/?url=https%3A%2F%2Fcareers.example.com" target="_blank" rel="noopener">Continue</a></footer>`;
     share.addEventListener('click', (e) => {
-      const b = e.target.closest('button');
+      const b = e.target.closest('button, a');
       if (!b) return;
+      e.preventDefault(); // jsdom cannot open tabs; the site lets the link through
       if (b.getAttribute('aria-label') === 'Dismiss') M.shareDismissed = j[0];
       else if (b.textContent.trim() === 'Continue') {
         M.externalOpened = j[0];
